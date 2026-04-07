@@ -543,16 +543,81 @@ pulse();
 }catch(e){}
 }
 
+let restFallback=null;
+let wsAttempts=0;
+
 function connectWS(){
 setWs(‘wait’,‘CONECTANDO’);
 if(E.ws){try{E.ws._kill=true;E.ws.close();}catch(e){}}
+clearInterval(restFallback);
 const sym=E.sym.toLowerCase(),t0=Date.now();
+
+// Try WebSocket
+try{
 E.ws=new WebSocket(`wss://stream.binance.com:9443/ws/${sym}@aggTrade`);
-E.ws.onopen=()=>{const lat=Date.now()-t0;g(‘latency’).textContent=lat;setWs(‘on’,‘AO VIVO’);log(`WS conectado · ${E.lbl} · ${lat}ms`,‘i’);};
-E.ws.onmessage=ev=>{const d=JSON.parse(ev.data);tick(parseFloat(d.p),parseInt(d.T));};
-E.ws.onerror=()=>setWs(‘off’,‘ERRO’);
-E.ws.onclose=()=>{if(E.ws._kill)return;setWs(‘off’,‘DESCONECT.’);setTimeout(connectWS,3000);};
+E.ws.onopen=()=>{
+wsAttempts=0;
+const lat=Date.now()-t0;
+g(‘latency’).textContent=lat;
+setWs(‘on’,‘AO VIVO’);
+clearInterval(restFallback); // WS ok, cancel REST fallback
+log(`WS conectado · ${E.lbl} · ${lat}ms`,‘i’);
+};
+E.ws.onmessage=ev=>{
+const d=JSON.parse(ev.data);
+tick(parseFloat(d.p),parseInt(d.T));
+};
+E.ws.onerror=()=>{
+wsAttempts++;
+log(`WS erro (tentativa ${wsAttempts}) — ativando modo REST...`,‘w’);
+startRestFallback();
+};
+E.ws.onclose=()=>{
+if(E.ws._kill)return;
+setWs(‘off’,‘DESCONECT.’);
+wsAttempts++;
+if(wsAttempts>=3){
+log(‘WS bloqueado — usando REST API Binance (atualiza a cada 2s)’,‘w’);
+startRestFallback();
+} else {
+setTimeout(connectWS,3000);
 }
+};
+// If no open after 5s, switch to REST
+setTimeout(()=>{
+if(E.ws&&E.ws.readyState!==1&&!restFallback){
+log(‘WS timeout — ativando REST fallback…’,‘w’);
+startRestFallback();
+}
+},5000);
+}catch(e){
+log(‘WS não suportado — usando REST API’,‘w’);
+startRestFallback();
+}
+}
+
+function startRestFallback(){
+if(restFallback)return; // already running
+setWs(‘wait’,‘REST API’);
+const sym=E.sym;
+restFallback=setInterval(async()=>{
+try{
+const r=await fetch(`https://api.binance.com/api/v3/ticker/price?symbol=${sym}`);
+const d=await r.json();
+const price=parseFloat(d.price);
+if(price){
+tick(price,Date.now());
+setWs(‘on’,‘REST 2s’);
+g(‘latency’).textContent=‘~2000’;
+}
+}catch(e){
+setWs(‘off’,‘SEM DADOS’);
+log(‘Erro REST API — verifique conexão’,‘e’);
+}
+},2000);
+log(`REST fallback ativo · ${sym} · atualiza a cada 2s`,‘i’);
+}
+
 function setWs(c,l){g(‘wsPill’).className=’ws-pill ’+c;g(‘wsLbl’).textContent=l;}
 function tick(price,ts){
 E.prev=E.price;E.price=price;E.ticks++;
@@ -821,7 +886,10 @@ const c=ev.target.closest(’.chip’);if(!c)return;
 document.querySelectorAll(’.chip’).forEach(x=>x.classList.remove(‘active’));c.classList.add(‘active’);
 E.sym=c.dataset.sym;E.lbl=c.dataset.lbl;E.price=null;E.prev=null;E.open=null;E.high=null;E.low=null;E.ticks=0;E.hist=[];E.signal=‘neutral’;
 g(‘heroAsset’).textContent=E.lbl+’ / USDT’;g(‘heroPrice’).textContent=’—’;
-if(E.ws){E.ws._kill=true;try{E.ws.close();}catch(e){}}log(`Trocando para ${E.lbl}...`,‘i’);connectWS();
+// Reset connection
+clearInterval(restFallback);restFallback=null;wsAttempts=0;
+if(E.ws){E.ws._kill=true;try{E.ws.close();}catch(e){}}
+log(`Trocando para ${E.lbl}...`,‘i’);connectWS();
 });
 [‘u’,‘d’].forEach(s=>{
 g(‘slp’+s.toUpperCase()).addEventListener(‘input’,function(){g(‘slpV’+s.toUpperCase()).textContent=this.value+’%’;});
