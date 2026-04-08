@@ -404,6 +404,23 @@ canvas#pcU,canvas#pcD{width:100%;height:68px;display:block;}
           </div>
           <div class="bridge" id="brDn"><div class="bi" id="brDnI">🔗</div><div class="bn"><div class="bt">BRIDGE DOWN</div><div class="bs wait" id="brDnS">Aguardando...</div></div></div>
         </div>
+        <div class="sec">📋 Histórico Combinado</div>
+        <div class="card" style="padding:0;overflow:hidden;margin-bottom:7px;">
+          <div class="thw" style="max-height:160px;">
+            <table class="tt" id="combinedHistory">
+              <thead><tr>
+                <th>#</th>
+                <th>BOT</th>
+                <th>ENTRADA</th>
+                <th>¢</th>
+                <th>T-IN</th>
+                <th>RES</th>
+                <th>P&L</th>
+              </tr></thead>
+              <tbody id="thCombined"></tbody>
+            </table>
+          </div>
+        </div>
         <div class="sec">📟 Log</div>
         <div class="lb" id="logBox"><div class="ll"><span class="lt">00:00:00</span><span class="lm i">MasterBot v3 iniciado.</span></div></div>
       </div>
@@ -976,7 +993,9 @@ function trade(B){
   const et=strong?(s==='u'?'⚡↑':'⚡↓'):'';
   const tag=apiOK()?'[REAL]':'[SIM]';
   const entryTime=now();
-  log(`${tag} ${s==='u'?'UP':'DOWN'} #${B.rounds} ${et} ENTRADA ${Math.round(polyP*100)}¢ @${entryTime} · aguardando ${tf}...`,'w');
+  const entryElapsedSecs=getPeriodElapsed(s);
+  const _em=Math.floor(entryElapsedSecs/60),_es=String(entryElapsedSecs%60).padStart(2,'0');
+  log(`${tag} ${s==='u'?'UP':'DOWN'} #${B.rounds} ${et} ENTRADA ${Math.round(polyP*100)}¢ @${entryTime} [${_em}:${_es} no período] · aguardando ${tf}...`,'w');
   updLbl(s);updBridges();updTS(s);
   // Resolve resultado após duração do timeframe
   setTimeout(()=>{
@@ -997,7 +1016,11 @@ function trade(B){
     const pct=(win?(profit/sz*100):(-100)).toFixed(1);
     if(win)log(`${tag} ${s==='u'?'UP':'DOWN'} #${B.rounds} ✓ +${profit.toFixed(2)} USDC (+${pct}%) · ${shares.toFixed(2)} shares @${polyP.toFixed(2)}`,'s');
     else   log(`${tag} ${s==='u'?'UP':'DOWN'} #${B.rounds} ✗ -${sz.toFixed(2)} USDC (-100%) · ${shares.toFixed(2)} shares @${polyP.toFixed(2)}`,'e');
-    addRow(s,B.rounds,et,sz,win,pd,Math.round(polyP*100),entryTime,pct.replace('+','').replace('%',''));updOV(s);drawPC(s);flash(win);updBridges();updLbl(s);
+    // Calculate period elapsed at entry time
+    const eMin=Math.floor(entryElapsedSecs/60);
+    const eSec=String(entryElapsedSecs%60).padStart(2,'0');
+    const elapsedFmt=`${eMin}:${eSec}`;
+    addRow(s,B.rounds,et,sz,win,pd,Math.round(polyP*100),entryTime,pct.replace('+','').replace('%',''),elapsedFmt);updOV(s);drawPC(s);flash(win);updBridges();updLbl(s);
     if(slOn&&B.consec>=slN){log(`⚠ Stop Loss ${s==='u'?'UP':'DOWN'}: ${B.consec} perdas.`,'w');toast(`Stop Loss ${s==='u'?'UP':'DOWN'}`);stopBot(s);return;}
     if(tpEn){
       const tp=parseFloat(g(s==='u'?'tpU':'tpD').value)||50;
@@ -1007,13 +1030,36 @@ function trade(B){
     }
   },dur);
 }
-function addRow(s,n,et,sz,win,pd,entryPrice,entryTime,pct){
+// Global trade counter for combined history
+let _tradeSeq=0;
+
+function addRow(s,n,et,sz,win,pd,entryPrice,entryTime,pct,periodElapsed){
+  _tradeSeq++;
   const tb=g('th'+s.toUpperCase());
   const tr=document.createElement('tr');
   const pctCol=win?`<span style="color:var(--up)">+${pct}%</span>`:`<span style="color:var(--dn)">-100%</span>`;
+  const elapsed=periodElapsed||'—';
   tr.innerHTML=`<td style="color:var(--g6)">${n}</td><td style="color:var(--gold)">${et||'—'}</td><td style="color:var(--blue);font-weight:700">${entryPrice}¢ <span style="color:var(--g6);font-weight:400">@${entryTime}</span></td><td style="color:var(--g7)">$${sz}</td><td>${pctCol}</td><td class="${win?'tw':'tl'}">${win?'WIN':'LOSS'}</td><td class="${win?'tw':'tl'}">${pd>=0?'+':''}${pd.toFixed(2)}</td><td style="color:var(--g6)">${now()}</td>`;
   tb.insertBefore(tr,tb.firstChild);
   while(tb.children.length>50)tb.removeChild(tb.lastChild);
+
+  // Also add to combined history in EdgeBot overview
+  const tc=g('thCombined');
+  if(tc){
+    const cr=document.createElement('tr');
+    const botCol=s==='u'
+      ?`<span style="color:var(--up);font-weight:700">UP↑</span>`
+      :`<span style="color:var(--dn);font-weight:700">DN↓</span>`;
+    const resCol=win
+      ?`<span style="color:var(--up)">✓</span>`
+      :`<span style="color:var(--dn)">✗</span>`;
+    const plCol=win
+      ?`<span style="color:var(--up)">+${pd.toFixed(2)}</span>`
+      :`<span style="color:var(--dn)">${pd.toFixed(2)}</span>`;
+    cr.innerHTML=`<td style="color:var(--g6)">${_tradeSeq}</td><td>${botCol}</td><td style="color:var(--g7)">@${entryTime}</td><td style="color:var(--blue);font-weight:700">${entryPrice}¢</td><td style="color:var(--gold)">${elapsed}</td><td>${resCol}</td><td>${plCol}</td>`;
+    tc.insertBefore(cr,tc.firstChild);
+    while(tc.children.length>30)tc.removeChild(tc.lastChild);
+  }
 }
 function updOV(s){
   const B=s==='u'?BU:BD,p=s==='u'?'ovUp':'ovDn';
