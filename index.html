@@ -111,6 +111,7 @@ body::after{content:'';position:fixed;inset:0;pointer-events:none;z-index:9999;b
 .rb{padding:2px 7px;border-radius:3px;border:1px solid var(–g5);background:transparent;font-family:‘Space Mono’,monospace;font-size:8px;color:var(–g6);cursor:pointer;transition:all .15s;}
 .rb.active{background:rgba(245,200,66,.12);border-color:var(–gold2);color:var(–gold);}
 canvas#ec{width:100%;height:88px;display:block;}
+canvas#clChart{width:100%;height:70px;display:block;}
 canvas#pcU,canvas#pcD{width:100%;height:68px;display:block;}
 
 /* EDGE SIGNAL */
@@ -335,6 +336,24 @@ canvas#pcU,canvas#pcD{width:100%;height:68px;display:block;}
           </div>
           <canvas id="ec"></canvas>
         </div>
+        <div class="cw" style="margin-top:0;">
+          <div class="ch">
+            <div class="cl" style="display:flex;align-items:center;gap:6px;">
+              <div style="width:5px;height:5px;border-radius:50%;background:#375bd2;"></div>
+              CHAINLINK · POLYMARKET REF
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <div style="font-family:'Space Mono',monospace;font-size:9px;color:var(--g7)">Δ vs Binance:</div>
+              <div style="font-family:'Space Mono',monospace;font-size:10px;font-weight:700;" id="clDiff">—</div>
+            </div>
+          </div>
+          <canvas id="clChart"></canvas>
+          <div style="display:flex;align-items:center;gap:8px;margin-top:5px;">
+            <div style="font-family:'Space Mono',monospace;font-size:8px;color:var(--g6)">CHAINLINK:</div>
+            <div style="font-family:'Bebas Neue',sans-serif;font-size:16px;" id="clPrice">—</div>
+            <div style="font-family:'Space Mono',monospace;font-size:8px;color:var(--g6);margin-left:auto;" id="clAge">—</div>
+          </div>
+        </div>
         <div class="ec2 en" id="edgeCard">
           <div class="et"><div class="el" id="edgeLbl" style="color:var(--g7)">⬛ NEUTRO</div><div class="em" id="edgeMom" style="color:var(--g7)">—</div></div>
           <div class="etr"><div class="ef" id="edgeFill" style="width:50%;background:var(--g5)"></div></div>
@@ -445,6 +464,14 @@ canvas#pcU,canvas#pcD{width:100%;height:68px;display:block;}
             <div id="tpFU">
               <div class="fld"><label>Variação mín. UP (%)</label><div class="fr"><input type="number" id="tpvU" value="0.3" min="0" max="10" step="0.1"><span class="fu2">%</span></div><div class="fh">Entra se subiu ≥ X% desde abertura do período</div></div>
             </div>
+            <div style="margin-top:6px;background:var(--g3);border:1px solid var(--g4);border-radius:6px;padding:8px;">
+              <div style="font-family:'Space Mono',monospace;font-size:8px;color:var(--g6);letter-spacing:1px;margin-bottom:6px;">⏱ JANELA DENTRO DO PERÍODO</div>
+              <div class="g2">
+                <div class="fld"><label>Entrar após (min:seg)</label><div class="fr"><input type="number" id="ptMinStartU" value="0" min="0" max="4" style="width:44px"><span class="fu2">:</span><input type="number" id="ptSecStartU" value="10" min="0" max="59" style="width:44px"></div><div class="fh">Ex: 0:10 = 10s após início</div></div>
+                <div class="fld"><label>Parar de entrar (min:seg)</label><div class="fr"><input type="number" id="ptMinEndU" value="3" min="0" max="4" style="width:44px"><span class="fu2">:</span><input type="number" id="ptSecEndU" value="0" min="0" max="59" style="width:44px"></div><div class="fh">Ex: 3:00 = até 3 min do período</div></div>
+              </div>
+              <div style="font-family:'Space Mono',monospace;font-size:8px;" id="ptStatusU"><span style="color:var(--g6)">Aguardando...</span></div>
+            </div>
             <div id="taFU" style="display:none">
               <div class="fld"><label>Preço acima de ($)</label><div class="fr"><input type="number" id="tavU" value="70000" min="0" step="100"><span class="fu2">$</span></div><div class="fh">Entra se preço > este valor</div></div>
             </div>
@@ -546,6 +573,14 @@ canvas#pcU,canvas#pcD{width:100%;height:68px;display:block;}
             <div id="tpFD">
               <div class="fld"><label>Variação mín. DOWN (%)</label><div class="fr"><input type="number" id="tpvD" value="0.3" min="0" max="10" step="0.1"><span class="fu2">%</span></div><div class="fh">Entra se caiu ≥ X% desde abertura do período</div></div>
             </div>
+            <div style="margin-top:6px;background:var(--g3);border:1px solid var(--g4);border-radius:6px;padding:8px;">
+              <div style="font-family:'Space Mono',monospace;font-size:8px;color:var(--g6);letter-spacing:1px;margin-bottom:6px;">⏱ JANELA DENTRO DO PERÍODO</div>
+              <div class="g2">
+                <div class="fld"><label>Entrar após (min:seg)</label><div class="fr"><input type="number" id="ptMinStartD" value="0" min="0" max="4" style="width:44px"><span class="fu2">:</span><input type="number" id="ptSecStartD" value="10" min="0" max="59" style="width:44px"></div><div class="fh">Ex: 0:10 = 10s após início</div></div>
+                <div class="fld"><label>Parar de entrar (min:seg)</label><div class="fr"><input type="number" id="ptMinEndD" value="3" min="0" max="4" style="width:44px"><span class="fu2">:</span><input type="number" id="ptSecEndD" value="0" min="0" max="59" style="width:44px"></div><div class="fh">Ex: 3:00 = até 3 min do período</div></div>
+              </div>
+              <div style="font-family:'Space Mono',monospace;font-size:8px;" id="ptStatusD"><span style="color:var(--g6)">Aguardando...</span></div>
+            </div>
             <div id="taFD" style="display:none">
               <div class="fld"><label>Preço abaixo de ($)</label><div class="fr"><input type="number" id="tavD" value="65000" min="0" step="100"><span class="fu2">$</span></div><div class="fh">Entra se preço &lt; este valor</div></div>
             </div>
@@ -615,17 +650,76 @@ function toast(msg){const t=g('toast');t.textContent=msg;t.classList.add('show')
 function flash(win){const d=document.createElement('div');d.className='tfl '+(win?'tfu2':'tfd2');document.body.appendChild(d);setTimeout(()=>d.remove(),500);}
 setInterval(()=>{const el=g('ovTime');if(el)el.textContent=now();},1000);
 
-// ═══ WAKE LOCK ═══
-let wakeLock=null;
-async function requestWakeLock(){
-  try{if('wakeLock' in navigator){wakeLock=await navigator.wakeLock.request('screen');}}catch(e){}
+// ═══ BACKGROUND KEEP-ALIVE ═══
+// iOS Safari suspends JS when minimized.
+// Solution: Web Audio silent oscillator keeps the audio session alive,
+// which prevents iOS from fully suspending the JS thread.
+let _audioCtx=null;
+let _audioNode=null;
+let _wakeLock=null;
+
+function startAudioKeepAlive(){
+  if(_audioCtx)return;
+  try{
+    _audioCtx=new(window.AudioContext||window.webkitAudioContext)();
+    // Create silent buffer that loops — keeps audio session alive
+    function scheduleSilence(){
+      if(!_audioCtx)return;
+      const buf=_audioCtx.createBuffer(1,_audioCtx.sampleRate*0.5,_audioCtx.sampleRate);
+      const src=_audioCtx.createBufferSource();
+      src.buffer=buf;
+      const gain=_audioCtx.createGain();
+      gain.gain.value=0.001; // essentially silent
+      src.connect(gain);
+      gain.connect(_audioCtx.destination);
+      src.start();
+      src.onended=scheduleSilence; // loop
+    }
+    scheduleSilence();
+    log('Audio keep-alive ativo — bot continua em background','i');
+  }catch(e){
+    log('Audio keep-alive não disponível: '+e.message,'w');
+  }
 }
+
+async function requestWakeLock(){
+  try{
+    if('wakeLock' in navigator){
+      _wakeLock=await navigator.wakeLock.request('screen');
+      _wakeLock.addEventListener('release',()=>{
+        // Re-request if released (e.g. screen dimmed)
+        setTimeout(requestWakeLock,1000);
+      });
+    }
+  }catch(e){}
+}
+
+// When app comes back to foreground
 document.addEventListener('visibilitychange',async()=>{
   if(document.visibilityState==='visible'){
+    // Reconnect WS if dropped while in background
+    if(!E.ws||E.ws.readyState>1){
+      log('Voltou ao primeiro plano — reconectando WS...','w');
+      connectWS();
+    }
+    // Re-request wake lock
     await requestWakeLock();
-    if(E.ws&&E.ws.readyState>1)connectWS();
+    // Resume audio context (iOS requires user gesture or visibility to resume)
+    if(_audioCtx&&_audioCtx.state==='suspended'){
+      _audioCtx.resume();
+    }
   }
 });
+
+// Heartbeat — reconnects WS if silent for too long
+let _lastTickTime=Date.now();
+setInterval(()=>{
+  const silent=Date.now()-_lastTickTime;
+  if(silent>15000&&(BU.running||BD.running)){
+    log('Sem dados há '+Math.round(silent/1000)+'s — reconectando...','w');
+    connectWS();
+  }
+},10000);
 
 // ═══ WEBSOCKET — conexão simples que funciona ═══
 function connectWS(){
@@ -654,6 +748,7 @@ function setWs(c,l){g('wsPill').className='ws-pill '+c;g('wsLbl').textContent=l;
 
 // ═══ TICK ═══
 function tick(price,ts){
+  _lastTickTime=Date.now();
   E.prev=E.price;E.price=price;E.ticks++;
   if(!E.open)E.open=price;
   if(!E.high||price>E.high)E.high=price;
@@ -822,6 +917,7 @@ function startBot(s){
   const tf=g(s==='u'?'tfU':'tfD').value;
   log(`DRBot ${s==='u'?'UP ↑':'DOWN ↓'} iniciado · ${E.lbl} ${tf} · ${mid}`,'i');
   requestWakeLock();
+  startAudioKeepAlive();
   updLbl(s);updBridges();
 }
 function stopBot(s){
@@ -852,6 +948,7 @@ function trade(B){
   const dl=parseInt(g(s==='u'?'dlU':'dlD').value)*1000;
   if(B._last&&Date.now()-B._last<dl)return;
   if(!inTW(s))return;
+  if(!isPeriodTimeOK(s))return;
   if(!trigOK(s))return;
   const mn=parseFloat(g(s==='u'?'tmnU':'tmnD').value);
   const mx=parseFloat(g(s==='u'?'tmxU':'tmxD').value);
@@ -1016,6 +1113,121 @@ window.addEventListener('pointermove',e=>{
 });
 window.addEventListener('pointerup',()=>{drag=false;});
 window.addEventListener('resize',()=>{drawEC();drawPC('u');drawPC('d');});
+
+// ═══ CHAINLINK PRICE (Polygon RPC — free & public) ═══
+const CL={price:null,hist:[],lastUpdate:null};
+// Chainlink BTC/USD aggregator on Polygon: 0xc907E116054Ad103354f2D350FD2514433D57F6f
+const CL_ADDR='0xc907E116054Ad103354f2D350FD2514433D57F6f';
+const CL_ABI_CALL='0xfeaf968c'; // latestRoundData() selector
+const POLYGON_RPC='https://polygon-rpc.com';
+
+async function fetchChainlink(){
+  try{
+    const body={jsonrpc:'2.0',method:'eth_call',params:[{to:CL_ADDR,data:CL_ABI_CALL},'latest'],id:1};
+    const r=await fetch(POLYGON_RPC,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    const d=await r.json();
+    if(d.result&&d.result!=='0x'){
+      // latestRoundData returns: roundId, answer, startedAt, updatedAt, answeredInRound
+      // answer is at offset 32 bytes (64 hex chars), 32 bytes long
+      const hex=d.result.slice(2);
+      const answer=parseInt(hex.slice(64,128),16);
+      const updatedAt=parseInt(hex.slice(128,192),16);
+      const price=answer/1e8; // Chainlink uses 8 decimals
+      if(price>1000){
+        CL.price=price;
+        CL.lastUpdate=updatedAt*1000;
+        CL.hist.push({t:Date.now(),p:price});
+        if(CL.hist.length>300)CL.hist.shift();
+        updateChainlinkUI();
+      }
+    }
+  }catch(e){}
+}
+
+function updateChainlinkUI(){
+  if(!CL.price)return;
+  const el=g('clPrice');
+  if(el){el.textContent=fp(CL.price,E.sym);el.style.color=CL.price>=(E.price||CL.price)?'var(--up)':'var(--dn)';}
+  const age=g('clAge');
+  if(age&&CL.lastUpdate){
+    const s=Math.round((Date.now()-CL.lastUpdate)/1000);
+    age.textContent=s<60?`${s}s atrás`:`${Math.round(s/60)}m atrás`;
+  }
+  const diff=g('clDiff');
+  if(diff&&E.price&&CL.price){
+    const d=((E.price-CL.price)/CL.price*100);
+    diff.textContent=(d>=0?'+':'')+d.toFixed(3)+'%';
+    diff.style.color=Math.abs(d)>0.05?'var(--gold)':'var(--up)';
+  }
+  drawCLChart();
+}
+
+function drawCLChart(){
+  const canvas=g('clChart');if(!canvas||!canvas.offsetWidth)return;
+  const data=CL.hist.slice(-150);if(data.length<2)return;
+  const dpr=window.devicePixelRatio||1,W=canvas.offsetWidth,H=70;
+  canvas.width=W*dpr;canvas.height=H*dpr;
+  const ctx=canvas.getContext('2d');ctx.scale(dpr,dpr);
+  const ps=data.map(x=>x.p),mn=Math.min(...ps),mx=Math.max(...ps),rng=mx-mn||1;
+  const pad={t:6,b:10,l:3,r:3},cW=W-pad.l-pad.r,cH=H-pad.t-pad.b;
+  ctx.clearRect(0,0,W,H);
+  ctx.strokeStyle='rgba(64,72,80,.5)';ctx.lineWidth=1;
+  for(let i=0;i<=2;i++){const y=pad.t+(cH/2)*i;ctx.beginPath();ctx.moveTo(pad.l,y);ctx.lineTo(W-pad.r,y);ctx.stroke();}
+  // Chainlink line (blue — Polymarket reference)
+  ctx.beginPath();
+  data.forEach((d,i)=>{const x=pad.l+(i/(data.length-1))*cW,y=pad.t+cH-((d.p-mn)/rng)*cH;i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);});
+  ctx.strokeStyle='#375bd2';ctx.lineWidth=1.5;ctx.lineJoin='round';ctx.stroke();
+  // Binance overlay (faint)
+  const binNow=E.hist.slice(-data.length);
+  if(binNow.length>1){
+    const bps=binNow.map(x=>x.p),bmn=Math.min(...bps,mn),bmx=Math.max(...bps,mx),brng=bmx-bmn||1;
+    ctx.beginPath();
+    binNow.forEach((d,i)=>{const x=pad.l+(i/(binNow.length-1))*cW,y=pad.t+cH-((d.p-bmn)/brng)*cH;i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);});
+    ctx.strokeStyle='rgba(0,255,170,.35)';ctx.lineWidth=1;ctx.setLineDash([3,3]);ctx.stroke();ctx.setLineDash([]);
+  }
+  ctx.fillStyle='rgba(107,120,133,.5)';ctx.font='7px Space Mono,monospace';
+  ctx.fillText(fp(mx,E.sym),pad.l+2,pad.t+8);
+}
+
+// Fetch Chainlink every 5s
+setInterval(fetchChainlink,5000);
+fetchChainlink();
+
+// ═══ PERIOD TIME TRIGGER ═══
+function getPeriodElapsed(s){
+  // Returns seconds elapsed within current period
+  const tf=g(s==='u'?'tfU':'tfD').value;
+  const periodSec={'1m':60,'5m':300,'15m':900,'1h':3600,'4h':14400}[tf]||300;
+  const nowSec=Math.floor(Date.now()/1000);
+  return nowSec%periodSec;
+}
+
+function isPeriodTimeOK(s){
+  const elapsed=getPeriodElapsed(s);
+  const startMin=parseInt(g(s==='u'?'ptMinStartU':'ptMinStartD').value)||0;
+  const startSec=parseInt(g(s==='u'?'ptSecStartU':'ptSecStartD').value)||10;
+  const endMin=parseInt(g(s==='u'?'ptMinEndU':'ptMinEndD').value)||3;
+  const endSec=parseInt(g(s==='u'?'ptSecEndU':'ptSecEndD').value)||0;
+  const startTotal=startMin*60+startSec;
+  const endTotal=endMin*60+endSec;
+  return elapsed>=startTotal&&elapsed<=endTotal;
+}
+
+function updatePeriodStatus(){
+  ['u','d'].forEach(s=>{
+    const el=g('ptStatus'+s.toUpperCase());if(!el)return;
+    const elapsed=getPeriodElapsed(s);
+    const ok=isPeriodTimeOK(s);
+    const mm=Math.floor(elapsed/60),ss=String(elapsed%60).padStart(2,'0');
+    const tf=g(s==='u'?'tfU':'tfD').value;
+    const periodSec={'1m':60,'5m':300,'15m':900,'1h':3600,'4h':14400}[tf]||300;
+    const remaining=periodSec-elapsed;
+    const rm=Math.floor(remaining/60),rs=String(remaining%60).padStart(2,'0');
+    const col=ok?'var(--up)':'var(--g6)';
+    el.innerHTML=`<span style="color:${col}">${ok?'✓ JANELA ABERTA':'✗ fora da janela'}</span> · <span style="color:var(--g7)">${mm}:${ss} elapsed · ${rm}:${rs} restantes</span>`;
+  });
+}
+setInterval(updatePeriodStatus,1000);
 
 // ═══ MARKET AUTO-CALC ═══
 function getMarketTimestamp(tfId){
