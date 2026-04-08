@@ -512,7 +512,7 @@ canvas#pcU,canvas#pcD{width:100%;height:68px;display:block;}
             </div></div>
           </div>
           <div class="sec">📋 Histórico UP</div>
-          <div class="card" style="padding:0;overflow:hidden;"><div class="thw"><table class="tt"><thead><tr><th>#</th><th>EDGE</th><th>SIZE</th><th>RES</th><th>P&L</th><th>HORA</th></tr></thead><tbody id="thU"></tbody></table></div></div>
+          <div class="card" style="padding:0;overflow:hidden;"><div class="thw"><table class="tt"><thead><tr><th>#</th><th>EDGE</th><th>ENTRADA</th><th>SIZE</th><th>%</th><th>RES</th><th>P&L</th><th>HORA</th></tr></thead><tbody id="thU"></tbody></table></div></div>
           <div class="sec">📈 P&L UP</div>
           <div class="card" style="padding:8px;"><canvas id="pcU"></canvas></div>
         </div>
@@ -621,7 +621,7 @@ canvas#pcU,canvas#pcD{width:100%;height:68px;display:block;}
             </div></div>
           </div>
           <div class="sec">📋 Histórico DOWN</div>
-          <div class="card" style="padding:0;overflow:hidden;"><div class="thw"><table class="tt"><thead><tr><th>#</th><th>EDGE</th><th>SIZE</th><th>RES</th><th>P&L</th><th>HORA</th></tr></thead><tbody id="thD"></tbody></table></div></div>
+          <div class="card" style="padding:0;overflow:hidden;"><div class="thw"><table class="tt"><thead><tr><th>#</th><th>EDGE</th><th>ENTRADA</th><th>SIZE</th><th>%</th><th>RES</th><th>P&L</th><th>HORA</th></tr></thead><tbody id="thD"></tbody></table></div></div>
           <div class="sec">📉 P&L DOWN</div>
           <div class="card" style="padding:8px;"><canvas id="pcD"></canvas></div>
         </div>
@@ -975,7 +975,8 @@ function trade(B){
   const dur={'1m':60000,'5m':300000,'15m':900000,'1h':3600000,'4h':14400000}[tf]||900000;
   const et=strong?(s==='u'?'⚡↑':'⚡↓'):'';
   const tag=apiOK()?'[REAL]':'[SIM]';
-  log(`${tag} ${s==='u'?'UP':'DOWN'} #${B.rounds} ${et} ENTRADA @${polyP.toFixed(2)} · aguardando ${tf}...`,'w');
+  const entryTime=now();
+  log(`${tag} ${s==='u'?'UP':'DOWN'} #${B.rounds} ${et} ENTRADA ${Math.round(polyP*100)}¢ @${entryTime} · aguardando ${tf}...`,'w');
   updLbl(s);updBridges();updTS(s);
   // Resolve resultado após duração do timeframe
   setTimeout(()=>{
@@ -996,7 +997,7 @@ function trade(B){
     const pct=(win?(profit/sz*100):(-100)).toFixed(1);
     if(win)log(`${tag} ${s==='u'?'UP':'DOWN'} #${B.rounds} ✓ +${profit.toFixed(2)} USDC (+${pct}%) · ${shares.toFixed(2)} shares @${polyP.toFixed(2)}`,'s');
     else   log(`${tag} ${s==='u'?'UP':'DOWN'} #${B.rounds} ✗ -${sz.toFixed(2)} USDC (-100%) · ${shares.toFixed(2)} shares @${polyP.toFixed(2)}`,'e');
-    addRow(s,B.rounds,et,sz,win,pd);updOV(s);drawPC(s);flash(win);updBridges();updLbl(s);
+    addRow(s,B.rounds,et,sz,win,pd,Math.round(polyP*100),entryTime,pct.replace('+','').replace('%',''));updOV(s);drawPC(s);flash(win);updBridges();updLbl(s);
     if(slOn&&B.consec>=slN){log(`⚠ Stop Loss ${s==='u'?'UP':'DOWN'}: ${B.consec} perdas.`,'w');toast(`Stop Loss ${s==='u'?'UP':'DOWN'}`);stopBot(s);return;}
     if(tpEn){
       const tp=parseFloat(g(s==='u'?'tpU':'tpD').value)||50;
@@ -1006,10 +1007,11 @@ function trade(B){
     }
   },dur);
 }
-function addRow(s,n,et,sz,win,pd){
+function addRow(s,n,et,sz,win,pd,entryPrice,entryTime,pct){
   const tb=g('th'+s.toUpperCase());
   const tr=document.createElement('tr');
-  tr.innerHTML=`<td style="color:var(--g6)">${n}</td><td style="color:var(--gold)">${et||'—'}</td><td style="color:var(--g7)">${sz}</td><td class="${win?'tw':'tl'}">${win?'WIN':'LOSS'}</td><td class="${win?'tw':'tl'}">${pd>=0?'+':''}${pd.toFixed(2)}</td><td style="color:var(--g6)">${now()}</td>`;
+  const pctCol=win?`<span style="color:var(--up)">+${pct}%</span>`:`<span style="color:var(--dn)">-100%</span>`;
+  tr.innerHTML=`<td style="color:var(--g6)">${n}</td><td style="color:var(--gold)">${et||'—'}</td><td style="color:var(--blue);font-weight:700">${entryPrice}¢ <span style="color:var(--g6);font-weight:400">@${entryTime}</span></td><td style="color:var(--g7)">$${sz}</td><td>${pctCol}</td><td class="${win?'tw':'tl'}">${win?'WIN':'LOSS'}</td><td class="${win?'tw':'tl'}">${pd>=0?'+':''}${pd.toFixed(2)}</td><td style="color:var(--g6)">${now()}</td>`;
   tb.insertBefore(tr,tb.firstChild);
   while(tb.children.length>50)tb.removeChild(tb.lastChild);
 }
