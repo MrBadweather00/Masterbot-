@@ -777,14 +777,22 @@ function tick(price,ts){
   const t=ts||Date.now();
   E.hist.push({t,p:price});
   E.hist=E.hist.filter(x=>x.t>Date.now()-600000);
-  // Atualiza period open SOMENTE se o bot não está rodando
-  // Quando rodando, a ref é fixada no START e resetada só após cada round
+  // Atualiza periodOpen a cada novo período de 5min (ou tf configurado)
+  // Isso garante que a referência sempre aponta para o início do período atual
+  // Só reseta se NÃO estiver em trade ativo (não interrompe round em andamento)
   ['u','d'].forEach(s=>{
     const B=s==='u'?BU:BD;
-    if(!B.running){
-      // Fora do bot: mantém period open atualizado para o display
+    if(!B.inTrade){
       const ms=tfMs(s);
-      if(!B.periodStart||t-B.periodStart>=ms){B.periodOpen=price;B.periodStart=t;}
+      // Verifica se começou um novo período pelo clock (independente do bot)
+      const nowSec=Math.floor(Date.now()/1000);
+      const periodSec=ms/1000;
+      const currentPeriodStart=Math.floor(nowSec/periodSec)*periodSec*1000;
+      if(!B.periodStart||B.periodStart<currentPeriodStart){
+        B.periodOpen=price;
+        B.periodStart=currentPeriodStart;
+        if(B.running)log(`DRBot ${s==='u'?'UP':'DOWN'} novo período — ref: $${price.toFixed(2)}`,'i');
+      }
     }
   });
   renderP();renderMkt();renderEdge();drawEC();
