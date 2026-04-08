@@ -546,7 +546,7 @@ canvas#pcU,canvas#pcD{width:100%;height:68px;display:block;}
         </div>
       </div>
     </div>
-    <div class="str"><div class="sdt" id="dotU" style="background:var(--g5)"></div><span style="color:var(--g6)" id="stxtU">Parado</span><span style="flex:1"></span><span id="tsiU" style="color:var(--g6);font-family:'Space Mono',monospace;font-size:8px;">—</span></div>
+    <div id="diagU" style="display:none;font-family:'Space Mono',monospace;font-size:8px;padding:4px 12px;background:rgba(245,200,66,.07);color:var(--gold);border-top:1px solid var(--g4);flex-shrink:0;"></div><div class="str"><div class="sdt" id="dotU" style="background:var(--g5)"></div><span style="color:var(--g6)" id="stxtU">Parado</span><span style="flex:1"></span><span id="tsiU" style="color:var(--g6);font-family:'Space Mono',monospace;font-size:8px;">—</span></div>
     <div class="bbtns"><button class="btn bsu" id="bsU" onclick="startBot('u')">▶ START UP ↑</button><button class="btn bxu" id="bxU" onclick="stopBot('u')" style="display:none">⏹ STOP</button><button class="btn br" onclick="resetBot('u')">↺</button></div>
   </div>
 </div>
@@ -666,7 +666,7 @@ canvas#pcU,canvas#pcD{width:100%;height:68px;display:block;}
         </div>
       </div>
     </div>
-    <div class="str"><div class="sdt" id="dotD" style="background:var(--g5)"></div><span style="color:var(--g6)" id="stxtD">Parado</span><span style="flex:1"></span><span id="tsiD" style="color:var(--g6);font-family:'Space Mono',monospace;font-size:8px;">—</span></div>
+    <div id="diagD" style="display:none;font-family:'Space Mono',monospace;font-size:8px;padding:4px 12px;background:rgba(245,200,66,.07);color:var(--gold);border-top:1px solid var(--g4);flex-shrink:0;"></div><div class="str"><div class="sdt" id="dotD" style="background:var(--g5)"></div><span style="color:var(--g6)" id="stxtD">Parado</span><span style="flex:1"></span><span id="tsiD" style="color:var(--g6);font-family:'Space Mono',monospace;font-size:8px;">—</span></div>
     <div class="bbtns"><button class="btn bsd" id="bsD" onclick="startBot('d')">▶ START DOWN ↓</button><button class="btn bxd" id="bxD" onclick="stopBot('d')" style="display:none">⏹ STOP</button><button class="btn br" onclick="resetBot('d')">↺</button></div>
   </div>
 </div>
@@ -1037,7 +1037,7 @@ function trade(B){
   const s=B.dir;
   if(!E.price||B.inTrade)return;
 
-  // 1. Delay entre rounds — lido ao vivo
+  // 1. Delay entre rounds
   const dl=(gi(s==='u'?'dlU':'dlD')||30)*1000;
   if(B._last&&Date.now()-B._last<dl)return;
 
@@ -1047,10 +1047,7 @@ function trade(B){
   // 3. Janela dentro do período
   if(!isPeriodTimeOK(s))return;
 
-  // 4. Trigger variação — lido ao vivo, SEM fallback
-  if(!trigOK(s))return;
-
-  // 5. Lê todos os parâmetros ao vivo
+  // ── Lê parâmetros ao vivo ANTES do trigOK para diagnóstico ──
   const mn=gf(s==='u'?'tmnU':'tmnD');
   const mx=gf(s==='u'?'tmxU':'tmxD');
   const sz=gf(s==='u'?'szU':'szD');
@@ -1062,25 +1059,48 @@ function trade(B){
   const mode=gv(s==='u'?'mktDirU':'mktDirD')||'up';
   const sig=E.signal;
   const tf=gv(s==='u'?'tfU':'tfD')||'5m';
+  const B2=s==='u'?BU:BD;
+  const ref=B2.periodOpen||E.price;
+  const diff=E.price-ref;
+  const diffPct=ref>0?(diff/ref*100):0;
+  const m=TM[s];
 
-  // 6. Limites
+  // 4. Trigger com diagnóstico detalhado
+  const diagEl=g('diag'+s.toUpperCase());
+  let trigPass=true;
+  let diagMsg='';
+  if(m==='pct'||m==='both'){
+    const th=gf(s==='u'?'tpvU':'tpvD');
+    if(isNaN(th)||th<=0){trigPass=false;diagMsg=`⚠ Variação% não configurada`;}
+    else{const ok=s==='u'?diffPct>=th:diffPct<=-th;if(!ok){trigPass=false;diagMsg=`Δ%: ${diffPct.toFixed(3)}% (precisa ${s==='u'?'≥+':'≤-'}${th}%)`;}else{diagMsg=`✓ Δ%: ${diffPct.toFixed(3)}%`;}}
+  }
+  if(trigPass&&(m==='abs'||m==='both')){
+    const delta=gf(s==='u'?'tavU':'tavD');
+    if(isNaN(delta)||delta<=0){trigPass=false;diagMsg=`⚠ Valor$ não configurado`;}
+    else{const ok=s==='u'?diff>=delta:diff<=-delta;if(!ok){trigPass=false;diagMsg+=` Δ$: $${diff.toFixed(0)} (precisa ${s==='u'?'≥+':'≤-'}$${delta})`;}else{diagMsg+=` ✓ Δ$: $${diff.toFixed(0)}`;}}
+  }
+  if(diagEl){diagEl.style.display='block';diagEl.innerHTML=diagMsg||'—';}
+  if(!trigPass)return;
+
+  // 5. Limites
   if(B.rounds>=mr){log(`DRBot ${s==='u'?'UP':'DOWN'}: ${mr} rounds completos.`,'w');stopBot(s);return;}
 
-  // 7. Direção
+  // 6. Direção
   const isUp=sig==='sup'||sig==='wup';
   const isDn=sig==='sdn'||sig==='wdn';
   const strong=sig==='sup'||sig==='sdn';
   let effectiveDir=mode;
+  let dirBlock='';
   if(mode==='auto'){
     if(strong){effectiveDir=sig==='sup'?'up':'down';}
-    else return; // AUTO só entra em sinal forte
+    else{if(diagEl)diagEl.innerHTML+=` · AUTO aguarda sinal forte (atual: ${sig})`;return;}
   } else {
-    if(effectiveDir==='up'&&isDn)return;
-    if(effectiveDir==='down'&&isUp)return;
+    if(effectiveDir==='up'&&isDn){if(diagEl)diagEl.innerHTML+=` · Bloqueado: Edge DOWN (${sig})`;return;}
+    if(effectiveDir==='down'&&isUp){if(diagEl)diagEl.innerHTML+=` · Bloqueado: Edge UP (${sig})`;return;}
   }
 
-  // 8. Filtro sinal forte
-  if(so&&!strong)return;
+  // 7. Filtro sinal forte
+  if(so&&!strong){if(diagEl)diagEl.innerHTML+=` · Aguarda FORTE (atual: ${sig})`;return;}
 
   // 9. Probabilidade
   let wp=0.50;
