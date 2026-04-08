@@ -777,11 +777,15 @@ function tick(price,ts){
   const t=ts||Date.now();
   E.hist.push({t,p:price});
   E.hist=E.hist.filter(x=>x.t>Date.now()-600000);
-  // Atualiza period open para cada bot
+  // Atualiza period open SOMENTE se o bot não está rodando
+  // Quando rodando, a ref é fixada no START e resetada só após cada round
   ['u','d'].forEach(s=>{
     const B=s==='u'?BU:BD;
-    const ms=tfMs(s);
-    if(!B.periodStart||t-B.periodStart>=ms){B.periodOpen=price;B.periodStart=t;}
+    if(!B.running){
+      // Fora do bot: mantém period open atualizado para o display
+      const ms=tfMs(s);
+      if(!B.periodStart||t-B.periodStart>=ms){B.periodOpen=price;B.periodStart=t;}
+    }
   });
   renderP();renderMkt();renderEdge();drawEC();
   updTS('u');updTS('d');
@@ -879,9 +883,10 @@ function updTS(s){
   if(!E.price){stEl.innerHTML='<span style="color:var(--g6)">Aguardando preço...</span>';return;}
   const B=s==='u'?BU:BD;
   const m=TM[s];
-  const ref=B.periodOpen||E.price; // preço de abertura do período
-  const diff=E.price-ref;          // diferença absoluta desde abertura
-  const diffPct=ref>0?(diff/ref*100):0; // diferença percentual
+  if(!B.periodOpen){stEl.innerHTML='<span style="color:var(--g6)">Aguardando ref...</span>';return;}
+  const ref=B.periodOpen; // preço fixado no START (nunca null aqui)
+  const diff=E.price-ref;
+  const diffPct=ref>0?(diff/ref*100):0;
   let msgs=[];
   if(m==='pct'||m==='both'){
     const th=gf(s==='u'?'tpvU':'tpvD');
@@ -912,7 +917,8 @@ function trigOK(s){
   if(!E.price)return false;
   const B=s==='u'?BU:BD;
   const m=TM[s];
-  const ref=B.periodOpen||E.price;
+  if(!B.periodOpen){return false;} // ref não definida ainda — aguarda START setar
+  const ref=B.periodOpen;
   const diff=E.price-ref;
   const diffPct=ref>0?(diff/ref*100):0;
   let pOk=true,aOk=true;
@@ -1000,7 +1006,10 @@ function startBot(s){
   if(m==='pct'||m==='both'){const th=gf(s==='u'?'tpvU':'tpvD');if(isNaN(th)||th<=0){toast('⚠ Insira variação % > 0');return;}}
   if(m==='abs'||m==='both'){const delta=gf(s==='u'?'tavU':'tavD');if(isNaN(delta)||delta<=0){toast('⚠ Insira valor absoluto $ > 0');return;}}
   B.running=true;B.inTrade=false;
-  B.periodOpen=E.price;B.periodStart=Date.now();
+  // Fixa o preço de referência no momento do START — nunca muda até o round terminar
+  B.periodOpen=E.price;
+  B.periodStart=Date.now();
+  log(`DRBot ${s==='u'?'UP':'DOWN'} ref inicial: $${E.price?E.price.toFixed(2):'aguardando preço'}`,'i');
   g('bs'+s.toUpperCase()).style.display='none';
   g('bx'+s.toUpperCase()).style.display='';
   const tf=gv(s==='u'?'tfU':'tfD');
@@ -1060,7 +1069,8 @@ function trade(B){
   const sig=E.signal;
   const tf=gv(s==='u'?'tfU':'tfD')||'5m';
   const B2=s==='u'?BU:BD;
-  const ref=B2.periodOpen||E.price;
+  const ref=B2.periodOpen; // fixado no START
+  if(!ref){const diagEl=g('diag'+s.toUpperCase());if(diagEl){diagEl.style.display='block';diagEl.textContent='Aguardando ref de preço...';}return;}
   const diff=E.price-ref;
   const diffPct=ref>0?(diff/ref*100):0;
   const m=TM[s];
@@ -1136,7 +1146,9 @@ function trade(B){
     B.pnlHist.push(B.pnl);
     if(win){B.wins++;B.consec=0;}else{B.losses++;B.consec++;}
     B.inTrade=false;
-    B.periodOpen=E.price;B.periodStart=Date.now();
+    // Reseta ref para o preço atual — próximo round começa do zero
+    B.periodOpen=E.price;
+    B.periodStart=Date.now();
     const pct=(win?(profit/sz*100):-100).toFixed(1);
     const elapsedFmt=`${em}:${es}`;
     if(win)log(`${tag} ${actualDir} #${B.rounds} ✓ +${profit.toFixed(2)} USDC (+${pct}%) · ${shares.toFixed(2)} shares @${polyP.toFixed(2)}`,'s');
