@@ -709,8 +709,8 @@ setInterval(()=>{const el=g('ovTime');if(el)el.textContent=now();},1000);
 
 // ── Lê período em ms do timeframe ──
 function tfMs(s){
-  const tf=gv(s==='u'?'tfU':'tfD')||'5m';
-  return {'1m':60000,'5m':300000,'15m':900000,'1h':3600000,'4h':14400000}[tf]||300000;
+  const tf=gv(s==='u'?'tfU':'tfD');
+  return ({'1m':60000,'5m':300000,'15m':900000,'1h':3600000,'4h':14400000}[tf])||300000;
 }
 function tfSec(s){return tfMs(s)/1000;}
 
@@ -815,7 +815,8 @@ function renderEdge(){
   const sl=E.hist.slice(-win).map(x=>x.p);
   const mom=(sl[sl.length-1]-sl[0])/sl[0];
   const MAX=0.003,norm=Math.max(0,Math.min(1,(mom+MAX)/(2*MAX))),nm=norm-0.5;
-  const upT=gf('upThresh')||0.25,dnT=gf('dnThresh')||0.25;
+  const upT=gf('upThresh'),dnT=gf('dnThresh');
+  if(isNaN(upT)||isNaN(dnT))return; // campos não preenchidos
   let sig,cls,lbl,col;
   if(nm>upT){sig='sup';cls='esu';lbl='🟢 FORTE UP';col='var(--up)';}
   else if(nm>0.05){sig='wup';cls='ewu';lbl='🟡 FRACO UP';col='var(--up2)';}
@@ -964,8 +965,11 @@ function isPeriodTimeOK(s){
   const endSec=gi('ptSecEnd'+SU)||0;
   const startTotal=startMin*60+startSec;
   const endTotal=endMin*60+endSec;
-  if(endTotal===0)return true; // se não configurado, sem restrição
-  return elapsed>=startTotal&&elapsed<=endTotal;
+  // Se nenhum campo configurado (tudo zero) = sem restrição
+  if(startTotal===0&&endTotal===0)return true;
+  // Se end < start = config inválida, deixa passar
+  if(endTotal>0&&endTotal<=startTotal)return true;
+  return elapsed>=startTotal&&(endTotal===0||elapsed<=endTotal);
 }
 function updatePeriodStatus(){
   ['u','d'].forEach(s=>{
@@ -1047,7 +1051,7 @@ function trade(B){
   if(!E.price||B.inTrade)return;
 
   // 1. Delay entre rounds
-  const dl=(gi(s==='u'?'dlU':'dlD')||30)*1000;
+  const dl=Math.max(5,(gi(s==='u'?'dlU':'dlD')||5))*1000; // mínimo 5s
   if(B._last&&Date.now()-B._last<dl)return;
 
   // 2. Janela de horário
@@ -1068,8 +1072,7 @@ function trade(B){
   const mode=gv(s==='u'?'mktDirU':'mktDirD')||'up';
   const sig=E.signal;
   const tf=gv(s==='u'?'tfU':'tfD')||'5m';
-  const B2=s==='u'?BU:BD;
-  const ref=B2.periodOpen; // fixado no START
+  const ref=B.periodOpen; // fixado no START — B já é BU ou BD
   if(!ref){const diagEl=g('diag'+s.toUpperCase());if(diagEl){diagEl.style.display='block';diagEl.textContent='Aguardando ref de preço...';}return;}
   const diff=E.price-ref;
   const diffPct=ref>0?(diff/ref*100):0;
@@ -1095,22 +1098,25 @@ function trade(B){
   // 5. Limites
   if(B.rounds>=mr){log(`DRBot ${s==='u'?'UP':'DOWN'}: ${mr} rounds completos.`,'w');stopBot(s);return;}
 
-  // 6. Direção
+  // 6. Direção — Edge é CONFIRMAÇÃO, não bloqueador
   const isUp=sig==='sup'||sig==='wup';
   const isDn=sig==='sdn'||sig==='wdn';
   const strong=sig==='sup'||sig==='sdn';
   let effectiveDir=mode;
-  let dirBlock='';
   if(mode==='auto'){
-    if(strong){effectiveDir=sig==='sup'?'up':'down';}
-    else{if(diagEl)diagEl.innerHTML+=` · AUTO aguarda sinal forte (atual: ${sig})`;return;}
-  } else {
-    if(effectiveDir==='up'&&isDn){if(diagEl)diagEl.innerHTML+=` · Bloqueado: Edge DOWN (${sig})`;return;}
-    if(effectiveDir==='down'&&isUp){if(diagEl)diagEl.innerHTML+=` · Bloqueado: Edge UP (${sig})`;return;}
+    // AUTO: edge define a direção — só entra se houver sinal claro
+    if(sig==='sup'||sig==='wup') effectiveDir='up';
+    else if(sig==='sdn'||sig==='wdn') effectiveDir='down';
+    else{if(diagEl)diagEl.innerHTML+=` · AUTO: sem sinal edge (${sig})`;return;}
   }
-
-  // 7. Filtro sinal forte
-  if(so&&!strong){if(diagEl)diagEl.innerHTML+=` · Aguarda FORTE (atual: ${sig})`;return;}
+  // Modo fixo (up/down): edge é apenas indicativo — não bloqueia
+  // "Só sinal FORTE" ainda pode filtrar se ativado
+  if(so){
+    // Só sinal forte: verifica se edge confirma a direção com sinal forte
+    const edgeOK=(effectiveDir==='up'&&sig==='sup')||(effectiveDir==='down'&&sig==='sdn');
+    if(!edgeOK){if(diagEl)diagEl.innerHTML+=` · Aguarda edge FORTE ${effectiveDir==='up'?'UP':'DOWN'} (atual: ${sig})`;return;}
+  }
+  if(diagEl)diagEl.innerHTML+=` · Edge: ${sig} ✓`;
 
   // 9. Probabilidade
   let wp=0.50;
@@ -1125,6 +1131,7 @@ function trade(B){
   const polyP=parseFloat((mn+Math.random()*(mx-mn)).toFixed(2));
 
   // 11. ENTROU
+  if(diagEl)diagEl.innerHTML='<span style="color:var(--up)">✓ ENTRANDO AGORA</span>';
   B.inTrade=true;B._last=Date.now();B.rounds++;
   const dur={'1m':60000,'5m':300000,'15m':900000,'1h':3600000,'4h':14400000}[tf]||300000;
   const et=strong?(effectiveDir==='up'?'⚡↑':'⚡↓'):'';
