@@ -455,7 +455,7 @@ canvas#pcU,canvas#pcD{width:100%;height:68px;display:block;}
           <div class="card">
             <div class="g2">
               <div class="fld"><label>Timeframe</label><select id="tfU"><option value="1m">1 min</option><option value="5m">5 min</option><option value="15m" selected>15 min</option><option value="1h">1 hora</option><option value="4h">4 horas</option></select></div>
-              <div class="fld"><label>Direção</label><select id="mktDirU"><option value="up">Will BTC go UP?</option><option value="down">Will BTC go DOWN?</option></select></div>
+              <div class="fld"><label>Modo</label><select id="mktDirU" onchange="updAutoMode()"><option value="up">Will BTC go UP?</option><option value="down">Will BTC go DOWN?</option><option value="auto">🤖 AUTO (sinal mais forte)</option></select></div>
             </div>
             <div style="margin-top:6px;background:var(--g3);border:1px solid var(--g5);border-radius:7px;padding:8px;">
               <div style="font-family:'Space Mono',monospace;font-size:8px;color:var(--g6);letter-spacing:1px;margin-bottom:5px;">MERCADO ATIVO AGORA</div>
@@ -468,10 +468,21 @@ canvas#pcU,canvas#pcD{width:100%;height:68px;display:block;}
             </div>
           </div>
           <div class="sec">🎯 Gatilho Polymarket</div>
+          <div style="background:var(--g3);border:1px solid var(--g4);border-radius:7px;padding:7px 10px;margin-bottom:7px;font-family:'Space Mono',monospace;font-size:8px;">
+            <div style="color:var(--g6);letter-spacing:1px;margin-bottom:4px;">ROI ESPERADO POR FAIXA</div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+              <span style="color:var(--up)">0.55¢ → +82%</span>
+              <span style="color:var(--up2)">0.65¢ → +54%</span>
+              <span style="color:var(--gold)">0.75¢ → +33%</span>
+              <span style="color:var(--dn2)">0.90¢ → +11%</span>
+              <span style="color:var(--dn)">0.97¢ → +3%</span>
+            </div>
+            <div style="color:var(--g6);margin-top:3px;">Break-even com 67% acerto: entrada ≤ <span style="color:var(--gold)" id="breakEvenU">—</span></div>
+          </div>
           <div class="card">
             <div class="g2">
-              <div class="fld"><label>Preço Mín.</label><div class="fr"><input type="number" id="tmnU" value="0.97" min="0.10" max="0.99" step="0.01"><span class="fu2">0–1</span></div><div class="fh">Ex: 0.97 = 97¢</div></div>
-              <div class="fld"><label>Preço Máx.</label><div class="fr"><input type="number" id="tmxU" value="0.99" min="0.10" max="0.99" step="0.01"><span class="fu2">0–1</span></div></div>
+              <div class="fld"><label>Preço Mín.</label><div class="fr"><input type="number" id="tmnU" value="0.55" min="0.10" max="0.99" step="0.01"><span class="fu2">0–1</span></div><div class="fh">0.55 = lucro +82% · 0.75 = lucro +33%</div></div>
+              <div class="fld"><label>Preço Máx.</label><div class="fr"><input type="number" id="tmxU" value="0.75" min="0.10" max="0.99" step="0.01"><span class="fu2">0–1</span></div></div>
             </div>
             <div class="fld" style="margin-top:4px"><label>Slippage máx (%)</label><div class="rr"><input type="range" id="slpU" min="1" max="50" value="30"><div class="rv" id="slpVU">30%</div></div></div>
           </div>
@@ -564,7 +575,7 @@ canvas#pcU,canvas#pcD{width:100%;height:68px;display:block;}
           <div class="card">
             <div class="g2">
               <div class="fld"><label>Timeframe</label><select id="tfD"><option value="1m">1 min</option><option value="5m">5 min</option><option value="15m" selected>15 min</option><option value="1h">1 hora</option><option value="4h">4 horas</option></select></div>
-              <div class="fld"><label>Direção</label><select id="mktDirD"><option value="down">Will BTC go DOWN?</option><option value="up">Will BTC go UP?</option></select></div>
+              <div class="fld"><label>Modo</label><select id="mktDirD" onchange="updAutoMode()"><option value="down">Will BTC go DOWN?</option><option value="up">Will BTC go UP?</option><option value="auto" selected>🤖 AUTO (sinal mais forte)</option></select></div>
             </div>
             <div style="margin-top:6px;background:var(--g3);border:1px solid var(--g5);border-radius:7px;padding:8px;">
               <div style="font-family:'Space Mono',monospace;font-size:8px;color:var(--g6);letter-spacing:1px;margin-bottom:5px;">MERCADO ATIVO AGORA</div>
@@ -577,10 +588,21 @@ canvas#pcU,canvas#pcD{width:100%;height:68px;display:block;}
             </div>
           </div>
           <div class="sec">🎯 Gatilho Polymarket</div>
+          <div style="background:var(--g3);border:1px solid var(--g4);border-radius:7px;padding:7px 10px;margin-bottom:7px;font-family:'Space Mono',monospace;font-size:8px;">
+            <div style="color:var(--g6);letter-spacing:1px;margin-bottom:4px;">ROI ESPERADO POR FAIXA</div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+              <span style="color:var(--up)">0.55¢ → +82%</span>
+              <span style="color:var(--up2)">0.65¢ → +54%</span>
+              <span style="color:var(--gold)">0.75¢ → +33%</span>
+              <span style="color:var(--dn2)">0.90¢ → +11%</span>
+              <span style="color:var(--dn)">0.97¢ → +3%</span>
+            </div>
+            <div style="color:var(--g6);margin-top:3px;">Break-even com 67% acerto: entrada ≤ <span style="color:var(--gold)" id="breakEvenD">—</span></div>
+          </div>
           <div class="card">
             <div class="g2">
-              <div class="fld"><label>Preço Mín.</label><div class="fr"><input type="number" id="tmnD" value="0.97" min="0.10" max="0.99" step="0.01"><span class="fu2">0–1</span></div><div class="fh">Ex: 0.97 = 97¢</div></div>
-              <div class="fld"><label>Preço Máx.</label><div class="fr"><input type="number" id="tmxD" value="0.99" min="0.10" max="0.99" step="0.01"><span class="fu2">0–1</span></div></div>
+              <div class="fld"><label>Preço Mín.</label><div class="fr"><input type="number" id="tmnD" value="0.55" min="0.10" max="0.99" step="0.01"><span class="fu2">0–1</span></div><div class="fh">0.55 = lucro +82% · 0.75 = lucro +33%</div></div>
+              <div class="fld"><label>Preço Máx.</label><div class="fr"><input type="number" id="tmxD" value="0.75" min="0.10" max="0.99" step="0.01"><span class="fu2">0–1</span></div></div>
             </div>
             <div class="fld" style="margin-top:4px"><label>Slippage máx (%)</label><div class="rr"><input type="range" id="slpD" min="1" max="50" value="30"><div class="rv" id="slpVD">30%</div></div></div>
           </div>
@@ -942,7 +964,7 @@ function stopBot(s){
   g('bs'+s.toUpperCase()).style.display='';
   g('bx'+s.toUpperCase()).style.display='none';
   const wr=B.rounds?Math.round(B.wins/B.rounds*100):0;
-  log(`DRBot ${s==='u'?'UP':'DOWN'} parado · R:${B.rounds} W:${B.wins} L:${B.losses} WR:${wr}% P&L:${B.pnl.toFixed(2)}`,'w');
+  log(`DRBot ${s==='u'?'UP↑':'DOWN↓'} parado · R:${B.rounds} W:${B.wins} L:${B.losses} WR:${wr}% P&L:${B.pnl.toFixed(2)}`,'w');
   updLbl(s);updBridges();
 }
 function resetBot(s){
@@ -979,13 +1001,26 @@ function trade(B){
   if(B.rounds>=mr){log(`DRBot ${s==='u'?'UP':'DOWN'}: ${mr} rounds completos.`,'w');stopBot(s);return;}
   const polyP=0.95+Math.random()*.04;
   if(polyP<mn||polyP>mx)return;
+  const mode=g(s==='u'?'mktDirU':'mktDirD').value;
   const isUp=sig==='sup'||sig==='wup',isDn=sig==='sdn'||sig==='wdn',strong=sig==='sup'||sig==='sdn';
-  if(s==='u'&&isDn)return;
-  if(s==='d'&&isUp)return;
-  if(so&&!strong&&sig!=='neutral')return;
+  // AUTO mode: follow strongest edge signal regardless of bot side
+  let effectiveDir=mode;
+  if(mode==='auto'){
+    if(sig==='sup'||sig==='wup') effectiveDir='up';
+    else if(sig==='sdn'||sig==='wdn') effectiveDir='down';
+    else return; // neutral — skip
+  }
+  // Non-auto: block if edge is against direction
+  if(mode!=='auto'){
+    if(effectiveDir==='up'&&isDn)return;
+    if(effectiveDir==='down'&&isUp)return;
+  }
+  if(so&&!strong)return; // strong-only filter applies in all modes
   let wp=.50;
-  if(s==='u'&&sig==='sup')wp=.66;else if(s==='u'&&sig==='wup')wp=.57;
-  else if(s==='d'&&sig==='sdn')wp=.66;else if(s==='d'&&sig==='wdn')wp=.57;
+  if(effectiveDir==='up'&&sig==='sup')wp=.66;else if(effectiveDir==='up'&&sig==='wup')wp=.57;
+  else if(effectiveDir==='down'&&sig==='sdn')wp=.66;else if(effectiveDir==='down'&&sig==='wdn')wp=.57;
+  // In AUTO mode, use the actual edge direction for logging
+  const actualDir=effectiveDir==='up'?'UP':'DOWN';
   // ENTROU — 1 entrada por round, aguarda duração do timeframe
   B.inTrade=true;B._last=Date.now();B.rounds++;
   const tf=g(s==='u'?'tfU':'tfD').value;
@@ -995,7 +1030,7 @@ function trade(B){
   const entryTime=now();
   const entryElapsedSecs=getPeriodElapsed(s);
   const _em=Math.floor(entryElapsedSecs/60),_es=String(entryElapsedSecs%60).padStart(2,'0');
-  log(`${tag} ${s==='u'?'UP':'DOWN'} #${B.rounds} ${et} ENTRADA ${Math.round(polyP*100)}¢ @${entryTime} [${_em}:${_es} no período] · aguardando ${tf}...`,'w');
+  log(`${tag} ${actualDir} #${B.rounds} ${et} ENTRADA ${Math.round(polyP*100)}¢ @${entryTime} [${_em}:${_es} no período] · aguardando ${tf}...`,'w');
   updLbl(s);updBridges();updTS(s);
   // Resolve resultado após duração do timeframe
   setTimeout(()=>{
@@ -1285,6 +1320,41 @@ function updatePeriodStatus(){
   });
 }
 setInterval(updatePeriodStatus,1000);
+
+// ═══ BREAK-EVEN CALCULATOR ═══
+function calcBreakEven(winRate){
+  // At price p: ROI = (1-p)/p per win, loss = -1
+  // Break-even: winRate*(1-p)/p = (1-winRate)*1
+  // => p = winRate / (1 - winRate + winRate) — simplified:
+  // Expected value = wr*(1/p - 1) - (1-wr) = 0
+  // => wr/p - wr - 1 + wr = 0 => wr/p = 1 => p = wr
+  // So break-even entry price = winRate (e.g. 67% WR → enter at max 0.67)
+  return winRate;
+}
+function updateBreakEvens(){
+  ['u','d'].forEach(s=>{
+    const B=s==='u'?BU:BD;
+    const wr=B.rounds?B.wins/B.rounds:null;
+    const el=g('breakEven'+s.toUpperCase());
+    if(!el)return;
+    if(!wr||B.rounds<5){el.textContent='(min 5 rounds)';return;}
+    const be=Math.floor(wr*100);
+    el.textContent=`${be}¢`;
+    el.style.color=be>=70?'var(--up)':be>=55?'var(--gold)':'var(--dn)';
+  });
+}
+setInterval(updateBreakEvens,5000);
+
+function updAutoMode(){
+  // Visual indicator for AUTO mode
+  ['u','d'].forEach(s=>{
+    const mode=g(s==='u'?'mktDirU':'mktDirD').value;
+    const bridgeTitle=g(s==='u'?'brUpS':'brDnS');
+    if(mode==='auto'&&bridgeTitle&&!BU.running&&!BD.running){
+      bridgeTitle.textContent='Modo AUTO — aguarda sinal mais forte';
+    }
+  });
+}
 
 // ═══ MARKET AUTO-CALC ═══
 function getMarketTimestamp(tfId){
