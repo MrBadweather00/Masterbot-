@@ -989,84 +989,99 @@ function updLbl(s){
 function trade(B){
   const s=B.dir;
   if(!E.price||B.inTrade)return;
-  const dl=parseInt(g(s==='u'?'dlU':'dlD').value)*1000;
+
+  // ── Lê configs sempre ao vivo — sem cache ──
+  const dl=parseInt(g(s==='u'?'dlU':'dlD').value)*1000||30000;
   if(B._last&&Date.now()-B._last<dl)return;
   if(!inTW(s))return;
   if(!isPeriodTimeOK(s))return;
   if(!trigOK(s))return;
-  const mn=parseFloat(g(s==='u'?'tmnU':'tmnD').value);
-  const mx=parseFloat(g(s==='u'?'tmxU':'tmxD').value);
-  const sz=parseFloat(g(s==='u'?'szU':'szD').value);
-  const mr=parseInt(g(s==='u'?'rnU':'rnD').value);
+
+  const mn=parseFloat(g(s==='u'?'tmnU':'tmnD').value)||0.55;
+  const mx=parseFloat(g(s==='u'?'tmxU':'tmxD').value)||0.75;
+  const sz=parseFloat(g(s==='u'?'szU':'szD').value)||5;
+  const mr=parseInt(g(s==='u'?'rnU':'rnD').value)||500;
   const so=g(s==='u'?'stU':'stD').checked;
   const slOn=g(s==='u'?'slU':'slD').checked;
-  const slN=parseInt(g(s==='u'?'slNU':'slND').value);
+  const slN=parseInt(g(s==='u'?'slNU':'slND').value)||5;
   const tpEn=g(s==='u'?'tpEnU':'tpEnD').checked;
-  const sig=E.signal;
-  if(B.rounds>=mr){log(`DRBot ${s==='u'?'UP':'DOWN'}: ${mr} rounds completos.`,'w');stopBot(s);return;}
-  const polyP=0.95+Math.random()*.04;
-  if(polyP<mn||polyP>mx)return;
   const mode=g(s==='u'?'mktDirU':'mktDirD').value;
-  const isUp=sig==='sup'||sig==='wup',isDn=sig==='sdn'||sig==='wdn',strong=sig==='sup'||sig==='sdn';
-  // AUTO mode: follow strongest edge signal regardless of bot side
+  const sig=E.signal;
+
+  if(B.rounds>=mr){log(`DRBot ${s==='u'?'UP':'DOWN'}: ${mr} rounds completos.`,'w');stopBot(s);return;}
+
+  // ── Direção ──
+  const isUp=sig==='sup'||sig==='wup';
+  const isDn=sig==='sdn'||sig==='wdn';
+  const strong=sig==='sup'||sig==='sdn';
   let effectiveDir=mode;
   if(mode==='auto'){
     if(sig==='sup'||sig==='wup') effectiveDir='up';
     else if(sig==='sdn'||sig==='wdn') effectiveDir='down';
-    else return; // neutral — skip
-  }
-  // Non-auto: block if edge is against direction
-  if(mode!=='auto'){
+    else return;
+  } else {
     if(effectiveDir==='up'&&isDn)return;
     if(effectiveDir==='down'&&isUp)return;
   }
-  if(so&&!strong)return; // strong-only filter applies in all modes
-  let wp=.50;
-  if(effectiveDir==='up'&&sig==='sup')wp=.66;else if(effectiveDir==='up'&&sig==='wup')wp=.57;
-  else if(effectiveDir==='down'&&sig==='sdn')wp=.66;else if(effectiveDir==='down'&&sig==='wdn')wp=.57;
-  // In AUTO mode, use the actual edge direction for logging
+
+  // ── Filtro sinal forte ──
+  if(so&&!strong)return;
+
+  // ── Probabilidade por força do sinal ──
+  let wp=0.50;
+  if(effectiveDir==='up'&&sig==='sup')wp=0.66;
+  else if(effectiveDir==='up'&&sig==='wup')wp=0.57;
+  else if(effectiveDir==='down'&&sig==='sdn')wp=0.66;
+  else if(effectiveDir==='down'&&sig==='wdn')wp=0.57;
+
   const actualDir=effectiveDir==='up'?'UP':'DOWN';
-  // ENTROU — 1 entrada por round, aguarda duração do timeframe
+
+  // ── Simula polyP dentro do range configurado ──
+  const polyP=parseFloat((mn+Math.random()*(mx-mn)).toFixed(2));
+
+  // ── ENTROU ──
   B.inTrade=true;B._last=Date.now();B.rounds++;
   const tf=g(s==='u'?'tfU':'tfD').value;
-  const dur={'1m':60000,'5m':300000,'15m':900000,'1h':3600000,'4h':14400000}[tf]||900000;
-  const et=strong?(s==='u'?'⚡↑':'⚡↓'):'';
+  const dur={'1m':60000,'5m':300000,'15m':900000,'1h':3600000,'4h':14400000}[tf]||300000;
+  const strong_et=strong?(effectiveDir==='up'?'⚡↑':'⚡↓'):'';
   const tag=apiOK()?'[REAL]':'[SIM]';
   const entryTime=now();
   const entryElapsedSecs=getPeriodElapsed(s);
   const _em=Math.floor(entryElapsedSecs/60),_es=String(entryElapsedSecs%60).padStart(2,'0');
-  log(`${tag} ${actualDir} #${B.rounds} ${et} ENTRADA ${Math.round(polyP*100)}¢ @${entryTime} [${_em}:${_es} no período] · aguardando ${tf}...`,'w');
+  log(`${tag} ${actualDir} #${B.rounds} ${strong_et} ENTRADA ${Math.round(polyP*100)}¢ @${entryTime} [${_em}:${_es} no período] · aguardando ${tf}...`,'w');
   updLbl(s);updBridges();updTS(s);
-  // Resolve resultado após duração do timeframe
+
+  // ── Resolve resultado após duração do timeframe ──
   setTimeout(()=>{
     if(!B.running)return;
-    // Cálculo correto Polymarket:
-    // Compramos (sz) USDC a preço polyP (ex: 0.97)
-    // Shares adquiridas = sz / polyP
-    // Se ganhar: recebe 1.00 por share → lucro = shares - sz = sz*(1/polyP - 1)
-    // Se perder: perde sz inteiro
+    // P&L real Polymarket: compra sz USDC a polyP
+    // shares = sz/polyP; lucro = shares - sz; perda = -sz
     const shares=sz/polyP;
-    const profit=parseFloat((shares-sz).toFixed(2)); // ex: $5/0.97 - $5 = ~$0.15
+    const profit=parseFloat((shares-sz).toFixed(2));
     const win=Math.random()<wp;
     const pd=win?profit:-sz;
-    B.pnl+=pd;B.pnlHist.push(parseFloat(B.pnl.toFixed(2)));
+    B.pnl=parseFloat((B.pnl+pd).toFixed(2));
+    B.pnlHist.push(B.pnl);
     if(win){B.wins++;B.consec=0;}else{B.losses++;B.consec++;}
     B.inTrade=false;
+    // Reseta abertura do período após cada round
     B.periodOpen=E.price;B.periodStart=Date.now();
-    const pct=(win?(profit/sz*100):(-100)).toFixed(1);
-    if(win)log(`${tag} ${s==='u'?'UP':'DOWN'} #${B.rounds} ✓ +${profit.toFixed(2)} USDC (+${pct}%) · ${shares.toFixed(2)} shares @${polyP.toFixed(2)}`,'s');
-    else   log(`${tag} ${s==='u'?'UP':'DOWN'} #${B.rounds} ✗ -${sz.toFixed(2)} USDC (-100%) · ${shares.toFixed(2)} shares @${polyP.toFixed(2)}`,'e');
-    // Calculate period elapsed at entry time
-    const eMin=Math.floor(entryElapsedSecs/60);
-    const eSec=String(entryElapsedSecs%60).padStart(2,'0');
-    const elapsedFmt=`${eMin}:${eSec}`;
-    addRow(s,B.rounds,et,sz,win,pd,Math.round(polyP*100),entryTime,pct.replace('+','').replace('%',''),elapsedFmt);updOV(s);drawPC(s);flash(win);updBridges();updLbl(s);
-    if(slOn&&B.consec>=slN){log(`⚠ Stop Loss ${s==='u'?'UP':'DOWN'}: ${B.consec} perdas.`,'w');toast(`Stop Loss ${s==='u'?'UP':'DOWN'}`);stopBot(s);return;}
+    const pct=(win?(profit/sz*100):-100).toFixed(1);
+    const elapsedFmt=`${_em}:${_es}`;
+    if(win)log(`${tag} ${actualDir} #${B.rounds} ✓ +${profit.toFixed(2)} USDC (+${pct}%) · ${shares.toFixed(2)} shares @${polyP.toFixed(2)}`,'s');
+    else   log(`${tag} ${actualDir} #${B.rounds} ✗ -${sz.toFixed(2)} USDC (-100%) · ${shares.toFixed(2)} shares @${polyP.toFixed(2)}`,'e');
+    addRow(s,B.rounds,strong_et,sz,win,pd,Math.round(polyP*100),entryTime,pct.replace('+','').replace('%',''),elapsedFmt);
+    updOV(s);drawPC(s);flash(win);updBridges();updLbl(s);
+    // ── Proteções ──
+    if(slOn&&B.consec>=slN){
+      log(`⚠ Stop Loss ${s==='u'?'UP':'DOWN'}: ${B.consec} perdas consecutivas.`,'w');
+      toast(`Stop Loss ${s==='u'?'UP':'DOWN'}`);stopBot(s);return;
+    }
     if(tpEn){
       const tp=parseFloat(g(s==='u'?'tpU':'tpD').value)||50;
       const ml=parseFloat(g(s==='u'?'mlU':'mlD').value)||30;
-      if(B.pnl>=tp){log(`🎯 TP ${s==='u'?'UP':'DOWN'}: +${B.pnl.toFixed(2)}`,'s');toast(`✅ TP: +${B.pnl.toFixed(2)}`);stopBot(s);return;}
-      if(B.pnl<=-ml){log(`🛑 Stop ${s==='u'?'UP':'DOWN'}: -${Math.abs(B.pnl).toFixed(2)}`,'e');stopBot(s);}
+      if(B.pnl>=tp){log(`🎯 TP ${actualDir}: +${B.pnl.toFixed(2)}`,'s');toast(`✅ TP: +${B.pnl.toFixed(2)}`);stopBot(s);return;}
+      if(B.pnl<=-ml){log(`🛑 Stop ${actualDir}: -${Math.abs(B.pnl).toFixed(2)}`,'e');stopBot(s);}
     }
   },dur);
 }
