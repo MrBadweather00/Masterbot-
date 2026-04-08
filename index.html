@@ -501,7 +501,7 @@ canvas#pcU,canvas#pcD{width:100%;height:68px;display:block;}
               <div style="font-family:'Space Mono',monospace;font-size:8px;" id="ptStatusU"><span style="color:var(--g6)">Aguardando...</span></div>
             </div>
             <div id="taFU" style="display:none">
-              <div class="fld"><label>Preço acima de ($)</label><div class="fr"><input type="number" id="tavU" value="70000" min="0" step="100"><span class="fu2">$</span></div><div class="fh">Entra se preço > este valor</div></div>
+              <div class="fld"><label>Variação acima de ($)</label><div class="fr"><input type="number" id="tavU" value="80" min="0" step="10"><span class="fu2">$</span></div><div class="fh">Entra se BTC subiu ≥ $80 desde abertura do período</div></div>
             </div>
             <div class="trs" id="tsU"><span style="color:var(--g6)">Aguardando dados...</span></div>
           </div>
@@ -621,7 +621,7 @@ canvas#pcU,canvas#pcD{width:100%;height:68px;display:block;}
               <div style="font-family:'Space Mono',monospace;font-size:8px;" id="ptStatusD"><span style="color:var(--g6)">Aguardando...</span></div>
             </div>
             <div id="taFD" style="display:none">
-              <div class="fld"><label>Preço abaixo de ($)</label><div class="fr"><input type="number" id="tavD" value="65000" min="0" step="100"><span class="fu2">$</span></div><div class="fh">Entra se preço &lt; este valor</div></div>
+              <div class="fld"><label>Variação abaixo de ($)</label><div class="fr"><input type="number" id="tavD" value="80" min="0" step="10"><span class="fu2">$</span></div><div class="fh">Entra se BTC caiu ≥ $80 desde abertura do período</div></div>
             </div>
             <div class="trs" id="tsD"><span style="color:var(--g6)">Aguardando dados...</span></div>
           </div>
@@ -888,9 +888,12 @@ function updTS(s){
     msgs.push(`<span style="color:${ok?'var(--up)':'var(--g7)'}">Δ${tf} abertura: ${chg>=0?'+':''}${chg.toFixed(3)}% ${ok?'✓':'✗'}</span>`);
   }
   if(m==='abs'||m==='both'){
-    const val=parseFloat(g(s==='u'?'tavU':'tavD').value);
-    const ok=s==='u'?E.price>val:E.price<val;
-    msgs.push(`<span style="color:${ok?'var(--up)':'var(--g7)'}">${s==='u'?'>':'<'}${fp(val,E.sym)} ${ok?'✓':'✗'}</span>`);
+    const delta=parseFloat(g(s==='u'?'tavU':'tavD').value)||80;
+    const ref=B.periodOpen||E.price;
+    const diff=E.price-ref; // positive = BTC went up, negative = down
+    const ok=s==='u'?diff>=delta:diff<=-delta;
+    const diffFmt=(diff>=0?'+':'')+diff.toFixed(0);
+    msgs.push(`<span style="color:${ok?'var(--up)':'var(--g7)'}">Δ$: ${diffFmt} (need ${s==='u'?'+':'−'}$${delta}) ${ok?'✓':'✗'}</span>`);
   }
   const inT=B.inTrade?` · <span style="color:var(--gold)">⏳ EM TRADE</span>`:'';
   stEl.innerHTML=(msgs.join(' · ')||'—')+inT;
@@ -907,8 +910,10 @@ function trigOK(s){
     pOk=s==='u'?chg>=th:chg<=-th;
   }
   if(m==='abs'||m==='both'){
-    const val=parseFloat(g(s==='u'?'tavU':'tavD').value);
-    aOk=s==='u'?E.price>val:E.price<val;
+    const delta=parseFloat(g(s==='u'?'tavU':'tavD').value)||80;
+    const ref=B.periodOpen||E.price;
+    const diff=E.price-ref;
+    aOk=s==='u'?diff>=delta:diff<=-delta;
   }
   return m==='pct'?pOk:m==='abs'?aOk:(pOk&&aOk);
 }
