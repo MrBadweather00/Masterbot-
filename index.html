@@ -421,6 +421,7 @@ canvas#pcU,canvas#pcD{width:100%;height:68px;display:block;}
             </table>
           </div>
         </div>
+        <div class="sec" style="cursor:pointer;" onclick="clearAll()">🗑 Limpar histórico</div>
         <div class="sec">📟 Log</div>
         <div class="lb" id="logBox"><div class="ll"><span class="lt">00:00:00</span><span class="lm i">MasterBot v3 iniciado.</span></div></div>
       </div>
@@ -687,6 +688,136 @@ const BD={dir:'d',running:false,rounds:0,wins:0,losses:0,pnl:0,consec:0,_last:nu
 // TM: modo de trigger por bot — lido do DOM mas cacheado aqui para setTM
 const TM={u:'pct',d:'pct'};
 let _tradeSeq=0;
+
+// ══════════════════════════════════════════
+// PERSISTÊNCIA — localStorage
+// Salva: configurações + histórico de trades
+// ══════════════════════════════════════════
+const SK='mbv3'; // storage key prefix
+
+// Campos de configuração a salvar por bot
+const CFG_FIELDS_U=['tfU','mktDirU','tmnU','tmxU','slpU','tpvU','tavU',
+  'ptMinStartU','ptSecStartU','ptMinEndU','ptSecEndU',
+  'szU','rnU','dlU','slNU','stU','slU','tpEnU','tpU','mlU','twU',
+  'tsU2','teU','upThresh','dnThresh','momWin'];
+const CFG_FIELDS_D=['tfD','mktDirD','tmnD','tmxD','slpD','tpvD','tavD',
+  'ptMinStartD','ptSecStartD','ptMinEndD','ptSecEndD',
+  'szD','rnD','dlD','slND','stD','slD','tpEnD','tpD','mlD','twD',
+  'tsD2','teD'];
+// API fields (saved separately, more sensitive)
+const CFG_API=['apiKey','apiSecret','apiPass'];
+
+function saveConfig(){
+  try{
+    const cfg={};
+    [...CFG_FIELDS_U,...CFG_FIELDS_D].forEach(id=>{
+      const el=document.getElementById(id);
+      if(!el)return;
+      cfg[id]=el.type==='checkbox'?el.checked:el.value;
+    });
+    // Save trigger modes
+    cfg['TM_u']=TM.u;
+    cfg['TM_d']=TM.d;
+    // Save day pickers
+    ['u','d'].forEach(s=>{
+      const days=[];
+      document.querySelectorAll('#dp'+s.toUpperCase()+' .db').forEach(b=>{
+        if(b.classList.contains('active'))days.push(b.dataset.day);
+      });
+      cfg['days_'+s]=days;
+    });
+    localStorage.setItem(SK+'_cfg',JSON.stringify(cfg));
+  }catch(e){}
+}
+
+function loadConfig(){
+  try{
+    const raw=localStorage.getItem(SK+'_cfg');
+    if(!raw)return;
+    const cfg=JSON.parse(raw);
+    [...CFG_FIELDS_U,...CFG_FIELDS_D].forEach(id=>{
+      const el=document.getElementById(id);
+      if(!el||cfg[id]===undefined)return;
+      if(el.type==='checkbox')el.checked=cfg[id];
+      else el.value=cfg[id];
+      // Trigger change events for toggles
+      if(el.type==='checkbox')el.dispatchEvent(new Event('change'));
+      if(el.type==='range'){const v=document.getElementById(id.replace('slp','slpV').replace('momWin','momWinVal'));if(v)v.textContent=el.value+(id.startsWith('slp')?'%':'');}
+    });
+    // Restore trigger modes
+    if(cfg['TM_u'])setTM('u',cfg['TM_u']);
+    if(cfg['TM_d'])setTM('d',cfg['TM_d']);
+    // Restore day pickers
+    ['u','d'].forEach(s=>{
+      const days=cfg['days_'+s]||[];
+      document.querySelectorAll('#dp'+s.toUpperCase()+' .db').forEach(b=>{
+        b.classList.toggle('active',days.includes(b.dataset.day));
+      });
+    });
+    log('⚙ Configurações restauradas','i');
+  }catch(e){}
+}
+
+function saveHistory(){
+  try{
+    const data={
+      seq:_tradeSeq,
+      u:{rounds:BU.rounds,wins:BU.wins,losses:BU.losses,pnl:BU.pnl,pnlHist:BU.pnlHist,consec:BU.consec},
+      d:{rounds:BD.rounds,wins:BD.wins,losses:BD.losses,pnl:BD.pnl,pnlHist:BD.pnlHist,consec:BD.consec},
+      rowsU:tblRows('thU'),
+      rowsD:tblRows('thD'),
+      rowsC:tblRows('thCombined'),
+      ts:Date.now()
+    };
+    localStorage.setItem(SK+'_hist',JSON.stringify(data));
+  }catch(e){}
+}
+
+function tblRows(id){
+  const tb=document.getElementById(id);
+  return tb?Array.from(tb.children).map(tr=>tr.innerHTML):[];
+}
+
+function loadHistory(){
+  try{
+    const raw=localStorage.getItem(SK+'_hist');
+    if(!raw)return;
+    const d=JSON.parse(raw);
+    _tradeSeq=d.seq||0;
+    if(d.u)Object.assign(BU,{rounds:d.u.rounds,wins:d.u.wins,losses:d.u.losses,pnl:d.u.pnl,pnlHist:d.u.pnlHist,consec:d.u.consec});
+    if(d.d)Object.assign(BD,{rounds:d.d.rounds,wins:d.d.wins,losses:d.d.losses,pnl:d.d.pnl,pnlHist:d.d.pnlHist,consec:d.d.consec});
+    const restoreTable=(id,rows)=>{
+      const tb=document.getElementById(id);
+      if(!tb||!rows)return;
+      tb.innerHTML='';
+      rows.forEach(r=>{const tr=document.createElement('tr');tr.innerHTML=r;tb.appendChild(tr);});
+    };
+    restoreTable('thU',d.rowsU);
+    restoreTable('thD',d.rowsD);
+    restoreTable('thCombined',d.rowsC);
+    updOV('u');updOV('d');
+    const ago=Math.round((Date.now()-d.ts)/60000);
+    log(`📂 Histórico restaurado · ${_tradeSeq} trades · salvo há ${ago<1?'<1':ago}min`,'i');
+  }catch(e){log('Sem histórico salvo — sessão nova.','i');}
+}
+
+function clearAll(){
+  if(!confirm('Apagar histórico e resetar estatísticas?'))return;
+  localStorage.removeItem(SK+'_hist');
+  resetBot('u');resetBot('d');
+  log('🗑 Histórico apagado.','w');
+}
+
+// Auto-save configs whenever any input changes
+function setupAutoSave(){
+  const allFields=[...CFG_FIELDS_U,...CFG_FIELDS_D];
+  allFields.forEach(id=>{
+    const el=document.getElementById(id);
+    if(!el)return;
+    el.addEventListener('change',saveConfig);
+    el.addEventListener('input',saveConfig);
+  });
+}
 
 // ── Helpers ──
 const g=id=>document.getElementById(id);
@@ -1170,6 +1301,7 @@ function trade(B){
     else   log(`${tag} ${actualDir} #${B.rounds} ✗ -${sz.toFixed(2)} USDC (-100%) · ${shares.toFixed(2)} shares @${polyP.toFixed(2)}`,'e');
     addRow(s,B.rounds,et,sz,win,pd,Math.round(polyP*100),entryTime,pct,elapsedFmt);
     updOV(s);drawPC(s);flash(win);updBridges();updLbl(s);
+    saveHistory();
     if(slOn&&B.consec>=slN){log(`⚠ Stop Loss ${actualDir}: ${B.consec} perdas.`,'w');toast(`Stop Loss ${actualDir}`);stopBot(s);return;}
     if(tpEn){
       const tp=gf(s==='u'?'tpU':'tpD');
@@ -1400,6 +1532,13 @@ window.addEventListener('resize',()=>{drawEC();drawPC('u');drawPC('d');});
 // ── Init ──
 connectWS();
 updateMarketDisplays();
+// Load saved config and history after DOM is ready
+setTimeout(()=>{
+  loadConfig();
+  loadHistory();
+  setupAutoSave();
+  drawPC('u');drawPC('d');
+},300);
 </script>
 
 </body>
