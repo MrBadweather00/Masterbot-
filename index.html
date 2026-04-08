@@ -980,13 +980,22 @@ function trade(B){
   // Resolve resultado após duração do timeframe
   setTimeout(()=>{
     if(!B.running)return;
-    const win=Math.random()<wp,pd=win?sz*.85:-sz;
+    // Cálculo correto Polymarket:
+    // Compramos (sz) USDC a preço polyP (ex: 0.97)
+    // Shares adquiridas = sz / polyP
+    // Se ganhar: recebe 1.00 por share → lucro = shares - sz = sz*(1/polyP - 1)
+    // Se perder: perde sz inteiro
+    const shares=sz/polyP;
+    const profit=parseFloat((shares-sz).toFixed(2)); // ex: $5/0.97 - $5 = ~$0.15
+    const win=Math.random()<wp;
+    const pd=win?profit:-sz;
     B.pnl+=pd;B.pnlHist.push(parseFloat(B.pnl.toFixed(2)));
     if(win){B.wins++;B.consec=0;}else{B.losses++;B.consec++;}
     B.inTrade=false;
     B.periodOpen=E.price;B.periodStart=Date.now();
-    if(win)log(`${tag} ${s==='u'?'UP':'DOWN'} #${B.rounds} RESULTADO ✓ +${(sz*.85).toFixed(2)} USDC`,'s');
-    else   log(`${tag} ${s==='u'?'UP':'DOWN'} #${B.rounds} RESULTADO ✗ -${sz.toFixed(2)} USDC`,'e');
+    const pct=(win?(profit/sz*100):(-100)).toFixed(1);
+    if(win)log(`${tag} ${s==='u'?'UP':'DOWN'} #${B.rounds} ✓ +${profit.toFixed(2)} USDC (+${pct}%) · ${shares.toFixed(2)} shares @${polyP.toFixed(2)}`,'s');
+    else   log(`${tag} ${s==='u'?'UP':'DOWN'} #${B.rounds} ✗ -${sz.toFixed(2)} USDC (-100%) · ${shares.toFixed(2)} shares @${polyP.toFixed(2)}`,'e');
     addRow(s,B.rounds,et,sz,win,pd);updOV(s);drawPC(s);flash(win);updBridges();updLbl(s);
     if(slOn&&B.consec>=slN){log(`⚠ Stop Loss ${s==='u'?'UP':'DOWN'}: ${B.consec} perdas.`,'w');toast(`Stop Loss ${s==='u'?'UP':'DOWN'}`);stopBot(s);return;}
     if(tpEn){
