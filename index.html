@@ -421,10 +421,14 @@ canvas#pcU,canvas#pcD{width:100%;height:68px;display:block;}
               <div class="fld"><label>Timeframe</label><select id="tfU"><option value="1m">1 min</option><option value="5m">5 min</option><option value="15m" selected>15 min</option><option value="1h">1 hora</option><option value="4h">4 horas</option></select></div>
               <div class="fld"><label>Direção</label><select id="mktDirU"><option value="up">Will BTC go UP?</option><option value="down">Will BTC go DOWN?</option></select></div>
             </div>
-            <div class="fld" style="margin-top:4px">
-              <label>Market ID da Polymarket</label>
-              <input type="text" id="midU" placeholder="Ex: 0x1a2b3c... (da URL do mercado)">
-              <div class="fh">Polymarket → mercado BTC 5/15min → ID na URL</div>
+            <div style="margin-top:6px;background:var(--g3);border:1px solid var(--g5);border-radius:7px;padding:8px;">
+              <div style="font-family:'Space Mono',monospace;font-size:8px;color:var(--g6);letter-spacing:1px;margin-bottom:5px;">MERCADO ATIVO AGORA</div>
+              <div style="font-family:'Space Mono',monospace;font-size:10px;" id="mktActiveU" style="color:var(--up)">Calculando...</div>
+              <div style="font-family:'Space Mono',monospace;font-size:8px;color:var(--g6);margin-top:3px;" id="mktSlugU">—</div>
+              <div style="display:flex;align-items:center;gap:6px;margin-top:5px;">
+                <div style="font-size:8px;font-family:'Space Mono',monospace;color:var(--g7);">Próximo em:</div>
+                <div style="font-family:'Bebas Neue',sans-serif;font-size:16px;color:var(--gold)" id="mktCountU">—</div>
+              </div>
             </div>
           </div>
           <div class="sec">🎯 Gatilho Polymarket</div>
@@ -518,10 +522,14 @@ canvas#pcU,canvas#pcD{width:100%;height:68px;display:block;}
               <div class="fld"><label>Timeframe</label><select id="tfD"><option value="1m">1 min</option><option value="5m">5 min</option><option value="15m" selected>15 min</option><option value="1h">1 hora</option><option value="4h">4 horas</option></select></div>
               <div class="fld"><label>Direção</label><select id="mktDirD"><option value="down">Will BTC go DOWN?</option><option value="up">Will BTC go UP?</option></select></div>
             </div>
-            <div class="fld" style="margin-top:4px">
-              <label>Market ID da Polymarket</label>
-              <input type="text" id="midD" placeholder="Ex: 0x1a2b3c... (da URL do mercado)">
-              <div class="fh">Polymarket → mercado BTC 5/15min → ID na URL</div>
+            <div style="margin-top:6px;background:var(--g3);border:1px solid var(--g5);border-radius:7px;padding:8px;">
+              <div style="font-family:'Space Mono',monospace;font-size:8px;color:var(--g6);letter-spacing:1px;margin-bottom:5px;">MERCADO ATIVO AGORA</div>
+              <div style="font-family:'Space Mono',monospace;font-size:10px;" id="mktActiveD" style="color:var(--dn)">Calculando...</div>
+              <div style="font-family:'Space Mono',monospace;font-size:8px;color:var(--g6);margin-top:3px;" id="mktSlugD">—</div>
+              <div style="display:flex;align-items:center;gap:6px;margin-top:5px;">
+                <div style="font-size:8px;font-family:'Space Mono',monospace;color:var(--g7);">Próximo em:</div>
+                <div style="font-family:'Bebas Neue',sans-serif;font-size:16px;color:var(--gold)" id="mktCountD">—</div>
+              </div>
             </div>
           </div>
           <div class="sec">🎯 Gatilho Polymarket</div>
@@ -807,13 +815,12 @@ function startBot(s){
   if(isNaN(mn)||mn<.1||mn>.99){toast('⚠ Trigger Mín: 0.10–0.99');return;}
   if(isNaN(mx)||mx<.1||mx>.99){toast('⚠ Trigger Máx: 0.10–0.99');return;}
   if(mn>mx){toast('⚠ Mín ≤ Máx');return;}
-  const mid=g(s==='u'?'midU':'midD').value.trim();
-  if(!mid){toast('⚠ Cole o Market ID da Polymarket');return;}
+  const mid=getCurrentMarketSlug(s==='u'?'tfU':'tfD');
   B.running=true;B.inTrade=false;B.periodOpen=E.price;B.periodStart=Date.now();
   g('bs'+s.toUpperCase()).style.display='none';
   g('bx'+s.toUpperCase()).style.display='';
   const tf=g(s==='u'?'tfU':'tfD').value;
-  log(`DRBot ${s==='u'?'UP ↑':'DOWN ↓'} iniciado · ${E.lbl} ${tf} · Market: ${mid.slice(0,16)}...`,'i');
+  log(`DRBot ${s==='u'?'UP ↑':'DOWN ↓'} iniciado · ${E.lbl} ${tf} · ${mid}`,'i');
   requestWakeLock();
   updLbl(s);updBridges();
 }
@@ -1010,8 +1017,63 @@ window.addEventListener('pointermove',e=>{
 window.addEventListener('pointerup',()=>{drag=false;});
 window.addEventListener('resize',()=>{drawEC();drawPC('u');drawPC('d');});
 
+// ═══ MARKET AUTO-CALC ═══
+function getMarketTimestamp(tfId){
+  const tf=g(tfId)?g(tfId).value:'5m';
+  const periodSec={'1m':60,'5m':300,'15m':900,'1h':3600,'4h':14400}[tf]||300;
+  const now=Math.floor(Date.now()/1000);
+  return Math.floor(now/periodSec)*periodSec;
+}
+function getCurrentMarketSlug(tfId){
+  const tf=g(tfId)?g(tfId).value:'5m';
+  const sym=E.sym.replace('USDT','').toLowerCase();
+  const ts=getMarketTimestamp(tfId);
+  return `${sym}-updown-${tf}-${ts}`;
+}
+function getMarketURL(tfId){
+  return 'https://polymarket.com/event/'+getCurrentMarketSlug(tfId);
+}
+function updateMarketDisplays(){
+  ['u','d'].forEach(s=>{
+    const tfId=s==='u'?'tfU':'tfD';
+    const tf=g(tfId)?g(tfId).value:'5m';
+    const periodSec={'1m':60,'5m':300,'15m':900,'1h':3600,'4h':14400}[tf]||300;
+    const now=Math.floor(Date.now()/1000);
+    const ts=getMarketTimestamp(tfId);
+    const nextTs=ts+periodSec;
+    const secsLeft=nextTs-now;
+    const mm=Math.floor(secsLeft/60);
+    const ss=String(secsLeft%60).padStart(2,'0');
+    const slug=getCurrentMarketSlug(tfId);
+    const SU=s.toUpperCase();
+    const activeEl=g('mktActive'+SU);
+    const slugEl=g('mktSlug'+SU);
+    const countEl=g('mktCount'+SU);
+    if(activeEl){
+      const sym=E.sym.replace('USDT','');
+      activeEl.textContent=`${sym} UP/DOWN ${tf} — ativo`;
+      activeEl.style.color=s==='u'?'var(--up)':'var(--dn)';
+    }
+    if(slugEl){
+      slugEl.innerHTML=`<a href="https://polymarket.com/event/${slug}" target="_blank" style="color:var(--blue);text-decoration:none;">${slug}</a>`;
+    }
+    if(countEl){
+      if(secsLeft<=0){
+        countEl.textContent='Renovando...';
+        countEl.style.color='var(--gold)';
+      } else {
+        countEl.textContent=`${mm}:${ss}`;
+        countEl.style.color=secsLeft<30?'var(--dn)':secsLeft<60?'var(--gold)':'var(--up)';
+      }
+    }
+  });
+}
+// Update every second
+setInterval(updateMarketDisplays,1000);
+
 // ═══ INIT ═══
 connectWS();
+updateMarketDisplays();
 </script>
 
 </body>
