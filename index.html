@@ -1217,21 +1217,31 @@ function trade(B){
   const diffPct=ref>0?(diff/ref*100):0;
   const m=TM[s];
 
-  // 4. Trigger com diagnóstico detalhado
+  // 4. Trigger — mostra todas as condições
   const diagEl=g('diag'+s.toUpperCase());
+  if(diagEl)diagEl.style.display='block';
   let trigPass=true;
-  let diagMsg='';
+  let parts=[];
+  parts.push('<span style="color:var(--g7)">ref:$'+ref.toFixed(0)+' agora:$'+E.price.toFixed(0)+'</span>');
   if(m==='pct'||m==='both'){
     const th=gf(s==='u'?'tpvU':'tpvD');
-    if(isNaN(th)||th<=0){trigPass=false;diagMsg=`⚠ Variação% não configurada`;}
-    else{const ok=s==='u'?diffPct>=th:diffPct<=-th;if(!ok){trigPass=false;diagMsg=`Δ%: ${diffPct.toFixed(3)}% (precisa ${s==='u'?'≥+':'≤-'}${th}%)`;}else{diagMsg=`✓ Δ%: ${diffPct.toFixed(3)}%`;}}
+    if(isNaN(th)||th<=0){trigPass=false;parts.push('<span style="color:var(--dn)">sem %</span>');}
+    else{
+      const ok=s==='u'?diffPct>=th:diffPct<=-th;
+      if(!ok)trigPass=false;
+      parts.push('<span style="color:'+(ok?'var(--up)':'var(--dn)').toString()+'">'+(ok?'✓':'✗')+' %:'+(diffPct>=0?'+':'')+diffPct.toFixed(2)+'% /'+th+'%</span>');
+    }
   }
-  if(trigPass&&(m==='abs'||m==='both')){
+  if(m==='abs'||m==='both'){
     const delta=gf(s==='u'?'tavU':'tavD');
-    if(isNaN(delta)||delta<=0){trigPass=false;diagMsg=`⚠ Valor$ não configurado`;}
-    else{const ok=s==='u'?diff>=delta:diff<=-delta;if(!ok){trigPass=false;diagMsg+=` Δ$: $${diff.toFixed(0)} (precisa ${s==='u'?'≥+':'≤-'}$${delta})`;}else{diagMsg+=` ✓ Δ$: $${diff.toFixed(0)}`;}}
+    if(isNaN(delta)||delta<=0){trigPass=false;parts.push('<span style="color:var(--dn)">sem $</span>');}
+    else{
+      const ok=s==='u'?diff>=delta:diff<=-delta;
+      if(!ok)trigPass=false;
+      parts.push('<span style="color:'+(ok?'var(--up)':'var(--dn)').toString()+'">'+(ok?'✓':'✗')+' $:'+(diff>=0?'+':'')+diff.toFixed(0)+' /'+(s==='u'?'+':'-')+delta+'</span>');
+    }
   }
-  if(diagEl){diagEl.style.display='block';diagEl.innerHTML=diagMsg||'—';}
+  if(diagEl)diagEl.innerHTML=parts.join(' · ');
   if(!trigPass)return;
 
   // 5. Limites
@@ -1248,21 +1258,24 @@ function trade(B){
     else if(sig==='sdn'||sig==='wdn') effectiveDir='down';
     else{if(diagEl)diagEl.innerHTML+=` · AUTO: sem sinal edge (${sig})`;return;}
   }
-  // Modo fixo (up/down): edge é apenas indicativo — não bloqueia
-  // "Só sinal FORTE" ainda pode filtrar se ativado
-  if(so){
-    // Só sinal forte: verifica se edge confirma a direção com sinal forte
+  // "Só sinal FORTE" só bloqueia no modo % Variação
+  // No modo Valor Absoluto ($) o movimento já é confirmação — edge não bloqueia
+  if(so&&m!=='abs'){
     const edgeOK=(effectiveDir==='up'&&sig==='sup')||(effectiveDir==='down'&&sig==='sdn');
-    if(!edgeOK){if(diagEl)diagEl.innerHTML+=` · Aguarda edge FORTE ${effectiveDir==='up'?'UP':'DOWN'} (atual: ${sig})`;return;}
+    if(!edgeOK){
+      if(diagEl)diagEl.innerHTML+=` · Aguarda FORTE ${effectiveDir==='up'?'UP':'DOWN'} (edge: ${sig})`;
+      return;
+    }
   }
-  if(diagEl)diagEl.innerHTML+=` · Edge: ${sig} ✓`;
+  if(diagEl)diagEl.innerHTML+=` · Edge: ${sig}${(sig==='sup'||sig==='sdn')?' ⚡':''}`;
 
-  // 9. Probabilidade
-  let wp=0.50;
-  if(effectiveDir==='up'&&sig==='sup')wp=0.66;
-  else if(effectiveDir==='up'&&sig==='wup')wp=0.57;
+  // 9. Probabilidade — edge aumenta confiança quando disponível
+  let wp=0.52; // base: ligeiramente acima do acaso
+  if(effectiveDir==='up'&&sig==='sup')wp=0.66;        // forte confirmado
+  else if(effectiveDir==='up'&&sig==='wup')wp=0.57;   // fraco confirmado
   else if(effectiveDir==='down'&&sig==='sdn')wp=0.66;
   else if(effectiveDir==='down'&&sig==='wdn')wp=0.57;
+  // neutro ou edge contrário = base 52%
 
   const actualDir=effectiveDir==='up'?'UP':'DOWN';
 
