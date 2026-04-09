@@ -8,13 +8,13 @@
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=JetBrains+Mono:wght@400;600;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
 :root{
-  --bg0:#2c3035;--bg1:#343a40;--bg2:#3c4248;--bg3:#444c54;--bg4:#4c555e;--bg5:#556068;
-  --b1:#4a5260;--b2:#586070;--b3:#667080;
+  --bg0:#14181c;--bg1:#1c2228;--bg2:#242c34;--bg3:#2c3540;--bg4:#34404c;--bg5:#3c4a58;
+  --b1:#2e3a46;--b2:#3a4856;--b3:#485868;
   --up:#00e5a0;--up2:#00b87a;--up3:rgba(0,229,160,.12);
   --dn:#ff3b5c;--dn2:#cc1a3a;--dn3:rgba(255,59,92,.12);
   --gold:#f0b429;--gold2:#c8891a;--gold3:rgba(240,180,41,.12);
   --blue:#3b9eff;--blue2:#1a7fd4;--blue3:rgba(59,158,255,.12);
-  --txt:#c8d8e8;--txt2:#90a8bc;--txt3:#6a8098;--white:#eef6ff;
+  --txt:#b8ccd8;--txt2:#7898b0;--txt3:#4a6478;--white:#e0f0ff;
 }
 *{box-sizing:border-box;margin:0;padding:0;}
 html,body{height:100%;overflow:hidden;}
@@ -630,112 +630,120 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
             <div class="range-row"><input type="range" id="momWin" min="3" max="50" value="10"><div class="range-val" id="momWinVal">10</div></div>
           </div>
         </div>
+
+```
+    <div class="sec">⏱ Relógio dos Períodos</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
+      <!-- UP clock -->
+      <div style="background:var(--bg2);border:1px solid rgba(0,229,160,.2);border-radius:10px;padding:10px;text-align:center;">
+        <div style="font-family:'JetBrains Mono',monospace;font-size:7px;color:var(--up);letter-spacing:1px;margin-bottom:6px;">UP ↑ · <span id="clockTfU">15min</span></div>
+        <div style="position:relative;width:64px;height:64px;margin:0 auto 6px;">
+          <svg width="64" height="64" viewBox="0 0 64 64" style="position:absolute;top:0;left:0;transform:rotate(-90deg)">
+            <circle cx="32" cy="32" r="26" fill="none" stroke="var(--b2)" stroke-width="4"/>
+            <circle cx="32" cy="32" r="26" fill="none" stroke="var(--up)" stroke-width="4"
+              stroke-dasharray="163" stroke-dashoffset="0" id="clockRingU"
+              stroke-linecap="round" style="transition:stroke-dashoffset .9s linear,stroke .3s"/>
+          </svg>
+          <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;">
+            <div style="font-family:'Bebas Neue',sans-serif;font-size:16px;line-height:1;" id="clockCdU">——</div>
+            <div style="font-family:'JetBrains Mono',monospace;font-size:6px;color:var(--txt3);" id="clockPctU">—%</div>
+          </div>
+        </div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:7px;" id="clockStU" style="color:var(--txt3)">Parado</div>
+      </div>
+      <!-- DOWN clock -->
+      <div style="background:var(--bg2);border:1px solid rgba(255,59,92,.2);border-radius:10px;padding:10px;text-align:center;">
+        <div style="font-family:'JetBrains Mono',monospace;font-size:7px;color:var(--dn);letter-spacing:1px;margin-bottom:6px;">DOWN ↓ · <span id="clockTfD">15min</span></div>
+        <div style="position:relative;width:64px;height:64px;margin:0 auto 6px;">
+          <svg width="64" height="64" viewBox="0 0 64 64" style="position:absolute;top:0;left:0;transform:rotate(-90deg)">
+            <circle cx="32" cy="32" r="26" fill="none" stroke="var(--b2)" stroke-width="4"/>
+            <circle cx="32" cy="32" r="26" fill="none" stroke="var(--dn)" stroke-width="4"
+              stroke-dasharray="163" stroke-dashoffset="0" id="clockRingD"
+              stroke-linecap="round" style="transition:stroke-dashoffset .9s linear,stroke .3s"/>
+          </svg>
+          <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;">
+            <div style="font-family:'Bebas Neue',sans-serif;font-size:16px;line-height:1;" id="clockCdD">——</div>
+            <div style="font-family:'JetBrains Mono',monospace;font-size:6px;color:var(--txt3);" id="clockPctD">—%</div>
+          </div>
+        </div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:7px;" id="clockStD" style="color:var(--txt3)">Parado</div>
       </div>
     </div>
-    <div class="divider" id="divider"></div>
-    <div class="split-r">
-      <div class="phead">
-        <div class="phead-title"><div class="phead-dot dot-e"></div>VISÃO GERAL</div>
-        <div style="font-family:'JetBrains Mono',monospace;font-size:7px;color:var(--txt2)" id="ovTime">—</div>
+
+  </div>
+</div>
+<div class="divider" id="divider"></div>
+<div class="split-r">
+  <div class="phead">
+    <div class="phead-title"><div class="phead-dot dot-e"></div>VISÃO GERAL</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:7px;color:var(--txt2)" id="ovTime">—</div>
+  </div>
+  <div class="pbody">
+    <!-- UP overview -->
+    <div class="ov-card ov-up">
+      <div class="ov-top">
+        <div>
+          <div class="ov-name ul">DRBOT UP ↑</div>
+          <div class="ov-status" id="ovUpSt">PARADO</div>
+        </div>
+        <div>
+          <div class="ov-pnl up" id="ovUpPnl">+0.00</div>
+          <div class="ov-pnl-lbl">P&L USDC</div>
+        </div>
       </div>
-      <div class="pbody">
-        <!-- UP overview -->
-        <div class="ov-card ov-up">
-          <div class="ov-top">
-            <div>
-              <div class="ov-name ul">DRBOT UP ↑</div>
-              <div class="ov-status" id="ovUpSt">PARADO</div>
-            </div>
-            <div>
-              <div class="ov-pnl up" id="ovUpPnl">+0.00</div>
-              <div class="ov-pnl-lbl">P&L USDC</div>
-            </div>
-          </div>
-          <div class="stats-grid cols3">
-            <div class="stat-box"><div class="stat-lbl">Rounds</div><div class="stat-val gold" id="ovUpR">0</div></div>
-            <div class="stat-box"><div class="stat-lbl">Wins</div><div class="stat-val up" id="ovUpW">0</div></div>
-            <div class="stat-box"><div class="stat-lbl">% Acerto</div><div class="stat-val" id="ovUpWR" style="color:var(--txt2)">—</div></div>
-          </div>
-          <div class="bridge" id="brUp"><div class="bridge-ico" id="brUpIco">🔗</div><div class="bridge-info"><div class="bridge-name">BRIDGE UP</div><div class="bridge-st wait" id="brUpSt">Aguardando...</div></div></div>
+      <div class="stats-grid cols3">
+        <div class="stat-box"><div class="stat-lbl">Rounds</div><div class="stat-val gold" id="ovUpR">0</div></div>
+        <div class="stat-box"><div class="stat-lbl">Wins</div><div class="stat-val up" id="ovUpW">0</div></div>
+        <div class="stat-box"><div class="stat-lbl">% Acerto</div><div class="stat-val" id="ovUpWR" style="color:var(--txt2)">—</div></div>
+      </div>
+      <div class="bridge" id="brUp"><div class="bridge-ico" id="brUpIco">🔗</div><div class="bridge-info"><div class="bridge-name">BRIDGE UP</div><div class="bridge-st wait" id="brUpSt">Aguardando...</div></div></div>
+    </div>
+    <!-- DOWN overview -->
+    <div class="ov-card ov-dn">
+      <div class="ov-top">
+        <div>
+          <div class="ov-name dl">DRBOT DOWN ↓</div>
+          <div class="ov-status" id="ovDnSt">PARADO</div>
         </div>
-        <!-- DOWN overview -->
-        <div class="ov-card ov-dn">
-          <div class="ov-top">
-            <div>
-              <div class="ov-name dl">DRBOT DOWN ↓</div>
-              <div class="ov-status" id="ovDnSt">PARADO</div>
-            </div>
-            <div>
-              <div class="ov-pnl dn" id="ovDnPnl">+0.00</div>
-              <div class="ov-pnl-lbl">P&L USDC</div>
-            </div>
-          </div>
-          <div class="stats-grid cols3">
-            <div class="stat-box"><div class="stat-lbl">Rounds</div><div class="stat-val gold" id="ovDnR">0</div></div>
-            <div class="stat-box"><div class="stat-lbl">Wins</div><div class="stat-val up" id="ovDnW">0</div></div>
-            <div class="stat-box"><div class="stat-lbl">% Acerto</div><div class="stat-val" id="ovDnWR" style="color:var(--txt2)">—</div></div>
-          </div>
-          <div class="bridge" id="brDn"><div class="bridge-ico" id="brDnIco">🔗</div><div class="bridge-info"><div class="bridge-name">BRIDGE DOWN</div><div class="bridge-st wait" id="brDnSt">Aguardando...</div></div></div>
+        <div>
+          <div class="ov-pnl dn" id="ovDnPnl">+0.00</div>
+          <div class="ov-pnl-lbl">P&L USDC</div>
         </div>
-        <!-- Combined -->
-        <div class="combined-box">
-          <div style="font-family:'JetBrains Mono',monospace;font-size:7px;color:var(--txt3);letter-spacing:1px;margin-bottom:7px;">TOTAL COMBINADO</div>
-          <div class="stats-grid">
-            <div class="stat-box"><div class="stat-lbl">Rounds</div><div class="stat-val gold" id="totR">0</div></div>
-            <div class="stat-box"><div class="stat-lbl">Wins</div><div class="stat-val up" id="totW">0</div></div>
-            <div class="stat-box"><div class="stat-lbl">% Acerto</div><div class="stat-val" id="totWR" style="color:var(--txt2)">—</div></div>
-            <div class="stat-box"><div class="stat-lbl">P&L Total</div><div class="stat-val" id="totPnl" style="color:var(--txt2)">+0.00</div></div>
-          </div>
-        </div>
-        <!-- Combined history -->
-        <div class="sec">📋 Histórico Combinado</div>
-        <div class="card" style="padding:0;overflow:hidden;margin-bottom:8px;">
-          <div class="tbl-wrap" style="max-height:160px;">
-            <table class="tbl">
-              <thead><tr><th>#</th><th>BOT</th><th>HORA</th><th>¢</th><th>Δ$</th><th>RES</th><th>P&L</th></tr></thead>
-              <tbody id="thCombined"></tbody>
-            </table>
-          </div>
-        </div>
-        <!-- Round clocks -->
-        <div class="sec">⏱ Próximo Período</div>
-        <div class="round-clock" id="clockU">
-          <div class="clock-ring">
-            <svg width="44" height="44" viewBox="0 0 44 44">
-              <circle cx="22" cy="22" r="18" fill="none" stroke="var(--b2)" stroke-width="3"/>
-              <circle cx="22" cy="22" r="18" fill="none" stroke="var(--up)" stroke-width="3"
-                stroke-dasharray="113" stroke-dashoffset="113" id="clockRingU"
-                stroke-linecap="round"/>
-            </svg>
-            <div class="clock-center" id="clockPctU">—</div>
-          </div>
-          <div class="clock-info">
-            <div class="clock-period">DRBOT UP ↑ · <span id="clockTfU">15min</span></div>
-            <div class="clock-countdown" id="clockCdU">—:——</div>
-            <div class="clock-status" id="clockStU">Aguardando período...</div>
-          </div>
-        </div>
-        <div class="round-clock" id="clockD">
-          <div class="clock-ring">
-            <svg width="44" height="44" viewBox="0 0 44 44">
-              <circle cx="22" cy="22" r="18" fill="none" stroke="var(--b2)" stroke-width="3"/>
-              <circle cx="22" cy="22" r="18" fill="none" stroke="var(--dn)" stroke-width="3"
-                stroke-dasharray="113" stroke-dashoffset="113" id="clockRingD"
-                stroke-linecap="round"/>
-            </svg>
-            <div class="clock-center" id="clockPctD">—</div>
-          </div>
-          <div class="clock-info">
-            <div class="clock-period">DRBOT DOWN ↓ · <span id="clockTfD">15min</span></div>
-            <div class="clock-countdown" id="clockCdD">—:——</div>
-            <div class="clock-status" id="clockStD">Aguardando período...</div>
-          </div>
-        </div>
-        <div class="sec" style="cursor:pointer" onclick="clearHistory()">🗑 Limpar histórico</div>
-        <div class="sec">📟 Log</div>
-        <div class="log-box" id="logBox"><div class="ll"><span class="lt">00:00:00</span><span class="lm i">MasterBot v4 iniciado.</span></div></div>
+      </div>
+      <div class="stats-grid cols3">
+        <div class="stat-box"><div class="stat-lbl">Rounds</div><div class="stat-val gold" id="ovDnR">0</div></div>
+        <div class="stat-box"><div class="stat-lbl">Wins</div><div class="stat-val up" id="ovDnW">0</div></div>
+        <div class="stat-box"><div class="stat-lbl">% Acerto</div><div class="stat-val" id="ovDnWR" style="color:var(--txt2)">—</div></div>
+      </div>
+      <div class="bridge" id="brDn"><div class="bridge-ico" id="brDnIco">🔗</div><div class="bridge-info"><div class="bridge-name">BRIDGE DOWN</div><div class="bridge-st wait" id="brDnSt">Aguardando...</div></div></div>
+    </div>
+    <!-- Combined -->
+    <div class="combined-box">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:7px;color:var(--txt3);letter-spacing:1px;margin-bottom:7px;">TOTAL COMBINADO</div>
+      <div class="stats-grid">
+        <div class="stat-box"><div class="stat-lbl">Rounds</div><div class="stat-val gold" id="totR">0</div></div>
+        <div class="stat-box"><div class="stat-lbl">Wins</div><div class="stat-val up" id="totW">0</div></div>
+        <div class="stat-box"><div class="stat-lbl">% Acerto</div><div class="stat-val" id="totWR" style="color:var(--txt2)">—</div></div>
+        <div class="stat-box"><div class="stat-lbl">P&L Total</div><div class="stat-val" id="totPnl" style="color:var(--txt2)">+0.00</div></div>
       </div>
     </div>
+    <!-- Combined history -->
+    <div class="sec">📋 Histórico Combinado</div>
+    <div class="card" style="padding:0;overflow:hidden;margin-bottom:8px;">
+      <div class="tbl-wrap" style="max-height:160px;">
+        <table class="tbl">
+          <thead><tr><th>#</th><th>BOT</th><th>HORA</th><th>¢</th><th>Δ$</th><th>RES</th><th>P&L</th></tr></thead>
+          <tbody id="thCombined"></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="sec" style="cursor:pointer" onclick="clearHistory()">🗑 Limpar histórico</div>
+    <div class="sec">📟 Log</div>
+    <div class="log-box" id="logBox"><div class="ll"><span class="lt">00:00:00</span><span class="lm i">MasterBot v4 iniciado.</span></div></div>
+  </div>
+</div>
+```
+
   </div>
 </div>
 
@@ -1729,45 +1737,38 @@ function updateClocks(){
     const remaining=periodSec-elapsed;
     const mm=String(Math.floor(remaining/60)).padStart(2,'0');
     const ss=String(remaining%60).padStart(2,'0');
+    // Ring drains as time passes: starts full (offset=0), ends empty (offset=163)
+    const circumference=163; // 2*pi*26
     const progress=elapsed/periodSec; // 0..1
-    const circumference=113;
-    const dashOffset=circumference-(progress*circumference);
+    const dashOffset=(progress*circumference).toFixed(1);
 
-    // Update ring
     const ring=g('clockRing'+SU);
-    if(ring)ring.setAttribute('stroke-dashoffset',dashOffset.toFixed(1));
+    if(ring){
+      ring.setAttribute('stroke-dashoffset',dashOffset);
+      // Color: gold when in trade, urgent red near end, normal otherwise
+      const clr=B.inTrade?'var(--gold)':remaining<=30?'var(--dn)':remaining<=60?'var(--gold)':(s==='u'?'var(--up)':'var(--dn)');
+      ring.setAttribute('stroke',clr);
+    }
 
-    // Update countdown
     const cd=g('clockCd'+SU);
     if(cd){
       cd.textContent=mm+':'+ss;
-      cd.className='clock-countdown'+(remaining<=30?' urgent':remaining<=60?' warning':'');
+      cd.style.color=remaining<=30?'var(--dn)':remaining<=60?'var(--gold)':'var(--white)';
     }
 
-    // Update pct in center
     const pct=g('clockPct'+SU);
-    if(pct)pct.textContent=Math.round(progress*100)+'%';
+    if(pct)pct.textContent=Math.round((1-progress)*100)+'%';
 
-    // Update tf label
     const tfEl=g('clockTf'+SU);
     if(tfEl)tfEl.textContent=tf;
 
-    // Status
     const stEl=g('clockSt'+SU);
     if(stEl){
-      if(B.inTrade){
-        stEl.textContent='⏳ EM TRADE';stEl.style.color='var(--gold)';
-      } else if(B.running){
-        stEl.textContent=remaining<=30?'⚠ Fechando em breve!':'Monitorando...';
+      if(B.inTrade){stEl.textContent='⏳ EM TRADE';stEl.style.color='var(--gold)';}
+      else if(B.running){
+        stEl.textContent=remaining<=30?'⚠ Fechando!':'Monitorando...';
         stEl.style.color=remaining<=30?'var(--dn)':'var(--txt3)';
-      } else {
-        stEl.textContent='Bot parado';stEl.style.color='var(--txt3)';
-      }
-    }
-
-    // Ring color when in trade
-    if(ring){
-      ring.setAttribute('stroke',B.inTrade?'var(--gold)':s==='u'?'var(--up)':'var(--dn)');
+      } else {stEl.textContent='Bot parado';stEl.style.color='var(--txt3)';}
     }
   });
 }
