@@ -1304,14 +1304,24 @@ function trade(B){
   _globalLock=true;
   if(diagEl)diagEl.innerHTML='<span style="color:var(--up)">✓ ENTRANDO AGORA</span>';
   B.inTrade=true;B._last=Date.now();B.rounds++;
-  const dur={'1m':60000,'5m':300000,'15m':900000,'1h':3600000,'4h':14400000}[tf]||300000;
+  // Calcula tempo ATÉ O FIM DO PERÍODO ATUAL (não duração fixa)
+  // Ex: entrou em 14:48:31 em período 5min → período fecha 14:50:00 → espera 89s
+  const periodSec={'1m':60,'5m':300,'15m':900,'1h':3600,'4h':14400}[tf]||300;
+  const nowSec=Math.floor(Date.now()/1000);
+  const currentPeriodStart=Math.floor(nowSec/periodSec)*periodSec;
+  const periodEnd=(currentPeriodStart+periodSec)*1000; // ms timestamp do fim
+  const msUntilEnd=periodEnd-Date.now();
+  // Mínimo 5s (caso entre nos últimos segundos), máximo = duração do período
+  const dur=Math.max(5000,msUntilEnd);
+  const secsLeft=Math.round(dur/1000);
+  const mLeft=Math.floor(secsLeft/60),sLeft=String(secsLeft%60).padStart(2,'0');
   const et=strong?(effectiveDir==='up'?'⚡↑':'⚡↓'):'';
   const tag=apiOK()?'[REAL]':'[SIM]';
   const entryTime=now();
   const entryElapsed=getPeriodElapsed(s);
   const em=Math.floor(entryElapsed/60),es=String(entryElapsed%60).padStart(2,'0');
   const entryDiff=parseFloat((E.price-(B.periodOpen||E.price)).toFixed(0)); // Δ$ no momento da entrada
-  log(`${tag} ${actualDir} #${B.rounds} ${et} ENTRADA ${Math.round(polyP*100)}¢ @${entryTime} [${em}:${es} no período] · aguardando ${tf}...`,'w');
+  log(`${tag} ${actualDir} #${B.rounds} ${et} ENTRADA ${Math.round(polyP*100)}¢ @${entryTime} [${em}:${es} no período] · fecha em ${mLeft}:${sLeft}...`,'w');
   updLbl(s);updBridges();updTS(s);
 
   // 12. Resolve resultado após duração do timeframe
