@@ -404,6 +404,13 @@ canvas#pcU,canvas#pcD{width:100%;height:68px;display:block;}
           </div>
           <div class="bridge" id="brDn"><div class="bi" id="brDnI">🔗</div><div class="bn"><div class="bt">BRIDGE DOWN</div><div class="bs wait" id="brDnS">Aguardando...</div></div></div>
         </div>
+        <div class="sec">📊 Total Combinado</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:5px;margin-bottom:7px;">
+          <div class="ss"><div class="sl">Rounds</div><div class="sv gold" id="totR">0</div></div>
+          <div class="ss"><div class="sl">Wins</div><div class="sv up" id="totW">0</div></div>
+          <div class="ss"><div class="sl">% Acerto</div><div class="sv" id="totWR" style="color:var(--g7)">—</div></div>
+          <div class="ss"><div class="sl">P&L Total</div><div class="sv" id="totPnl" style="color:var(--g7)">+0.00</div></div>
+        </div>
         <div class="sec">📋 Histórico Combinado</div>
         <div class="card" style="padding:0;overflow:hidden;margin-bottom:7px;">
           <div class="thw" style="max-height:160px;">
@@ -413,6 +420,7 @@ canvas#pcU,canvas#pcD{width:100%;height:68px;display:block;}
                 <th>BOT</th>
                 <th>ENTRADA</th>
                 <th>¢</th>
+                <th>Δ$</th>
                 <th>T-IN</th>
                 <th>RES</th>
                 <th>P&L</th>
@@ -541,7 +549,7 @@ canvas#pcU,canvas#pcD{width:100%;height:68px;display:block;}
             </div></div>
           </div>
           <div class="sec">📋 Histórico UP</div>
-          <div class="card" style="padding:0;overflow:hidden;"><div class="thw"><table class="tt"><thead><tr><th>#</th><th>EDGE</th><th>ENTRADA</th><th>SIZE</th><th>%</th><th>RES</th><th>P&L</th><th>HORA</th></tr></thead><tbody id="thU"></tbody></table></div></div>
+          <div class="card" style="padding:0;overflow:hidden;"><div class="thw"><table class="tt"><thead><tr><th>#</th><th>EDGE</th><th>ENTRADA</th><th>Δ$</th><th>SIZE</th><th>%</th><th>RES</th><th>P&L</th></tr></thead><tbody id="thU"></tbody></table></div></div>
           <div class="sec">📈 P&L UP</div>
           <div class="card" style="padding:8px;"><canvas id="pcU"></canvas></div>
         </div>
@@ -661,7 +669,7 @@ canvas#pcU,canvas#pcD{width:100%;height:68px;display:block;}
             </div></div>
           </div>
           <div class="sec">📋 Histórico DOWN</div>
-          <div class="card" style="padding:0;overflow:hidden;"><div class="thw"><table class="tt"><thead><tr><th>#</th><th>EDGE</th><th>ENTRADA</th><th>SIZE</th><th>%</th><th>RES</th><th>P&L</th><th>HORA</th></tr></thead><tbody id="thD"></tbody></table></div></div>
+          <div class="card" style="padding:0;overflow:hidden;"><div class="thw"><table class="tt"><thead><tr><th>#</th><th>EDGE</th><th>ENTRADA</th><th>Δ$</th><th>SIZE</th><th>%</th><th>RES</th><th>P&L</th></tr></thead><tbody id="thD"></tbody></table></div></div>
           <div class="sec">📉 P&L DOWN</div>
           <div class="card" style="padding:8px;"><canvas id="pcD"></canvas></div>
         </div>
@@ -688,6 +696,7 @@ const BD={dir:'d',running:false,rounds:0,wins:0,losses:0,pnl:0,consec:0,_last:nu
 // TM: modo de trigger por bot — lido do DOM mas cacheado aqui para setTM
 const TM={u:'pct',d:'pct'};
 let _tradeSeq=0;
+let _globalLock=false; // true quando qualquer bot está em trade — bloqueia o outro
 
 // ══════════════════════════════════════════
 // PERSISTÊNCIA — localStorage
@@ -983,6 +992,7 @@ function updBr(s){
   let cls,ico,msg,sc;
   if(!B.running){cls='';ico='🔗';msg='Aguardando bot iniciar...';sc='wait';}
   else if(B.inTrade){cls='';ico='⏳';msg='Em trade — aguardando resultado...';sc='wait';}
+  else if(_globalLock&&!B.inTrade){cls='blk';ico='🔒';msg='Bloqueado — outro bot em trade';sc='blk';}
   else if(s==='u'){
     const mode=gv('mktDirU');
     if(mode==='auto'){
@@ -1162,6 +1172,7 @@ function startBot(s){
 }
 function stopBot(s){
   const B=s==='u'?BU:BD;B.running=false;B.inTrade=false;
+  _globalLock=false; // garante que o lock é liberado ao parar
   g('bs'+s.toUpperCase()).style.display='';
   g('bx'+s.toUpperCase()).style.display='none';
   const wr=B.rounds?Math.round(B.wins/B.rounds*100):0;
@@ -1171,6 +1182,7 @@ function stopBot(s){
 function resetBot(s){
   const B=s==='u'?BU:BD;
   Object.assign(B,{running:false,rounds:0,wins:0,losses:0,pnl:0,consec:0,_last:null,pnlHist:[0],inTrade:false,periodOpen:null,periodStart:null});
+  if(!BU.inTrade&&!BD.inTrade)_globalLock=false;
   const tb=g('th'+s.toUpperCase());if(tb)tb.innerHTML='';
   drawPC(s);updLbl(s);updOV(s);
   log(`DRBot ${s==='u'?'UP':'DOWN'} resetado.`,'i');
@@ -1188,6 +1200,12 @@ function updLbl(s){
 function trade(B){
   const s=B.dir;
   if(!E.price||B.inTrade)return;
+  // Bloqueia se o OUTRO bot já está em trade
+  if(_globalLock&&!B.inTrade){
+    const diagEl=g('diag'+s.toUpperCase());
+    if(diagEl){diagEl.style.display='block';diagEl.innerHTML='<span style="color:var(--gold)">⏳ Aguardando outro bot terminar o round...</span>';}
+    return;
+  }
 
   // 1. Delay entre rounds
   const dl=Math.max(5,(gi(s==='u'?'dlU':'dlD')||5))*1000; // mínimo 5s
@@ -1282,7 +1300,8 @@ function trade(B){
   // 10. Simula polyP dentro do range configurado (sem fallback)
   const polyP=parseFloat((mn+Math.random()*(mx-mn)).toFixed(2));
 
-  // 11. ENTROU
+  // 11. ENTROU — ativa lock global
+  _globalLock=true;
   if(diagEl)diagEl.innerHTML='<span style="color:var(--up)">✓ ENTRANDO AGORA</span>';
   B.inTrade=true;B._last=Date.now();B.rounds++;
   const dur={'1m':60000,'5m':300000,'15m':900000,'1h':3600000,'4h':14400000}[tf]||300000;
@@ -1291,6 +1310,7 @@ function trade(B){
   const entryTime=now();
   const entryElapsed=getPeriodElapsed(s);
   const em=Math.floor(entryElapsed/60),es=String(entryElapsed%60).padStart(2,'0');
+  const entryDiff=parseFloat((E.price-(B.periodOpen||E.price)).toFixed(0)); // Δ$ no momento da entrada
   log(`${tag} ${actualDir} #${B.rounds} ${et} ENTRADA ${Math.round(polyP*100)}¢ @${entryTime} [${em}:${es} no período] · aguardando ${tf}...`,'w');
   updLbl(s);updBridges();updTS(s);
 
@@ -1305,6 +1325,7 @@ function trade(B){
     B.pnlHist.push(B.pnl);
     if(win){B.wins++;B.consec=0;}else{B.losses++;B.consec++;}
     B.inTrade=false;
+    _globalLock=false; // libera o outro bot
     // Reseta ref para o preço atual — próximo round começa do zero
     B.periodOpen=E.price;
     B.periodStart=Date.now();
@@ -1312,7 +1333,7 @@ function trade(B){
     const elapsedFmt=`${em}:${es}`;
     if(win)log(`${tag} ${actualDir} #${B.rounds} ✓ +${profit.toFixed(2)} USDC (+${pct}%) · ${shares.toFixed(2)} shares @${polyP.toFixed(2)}`,'s');
     else   log(`${tag} ${actualDir} #${B.rounds} ✗ -${sz.toFixed(2)} USDC (-100%) · ${shares.toFixed(2)} shares @${polyP.toFixed(2)}`,'e');
-    addRow(s,B.rounds,et,sz,win,pd,Math.round(polyP*100),entryTime,pct,elapsedFmt);
+    addRow(s,B.rounds,et,sz,win,pd,Math.round(polyP*100),entryTime,pct,elapsedFmt,entryDiff);
     updOV(s);drawPC(s);flash(win);updBridges();updLbl(s);
     saveHistory();
     if(slOn&&B.consec>=slN){log(`⚠ Stop Loss ${actualDir}: ${B.consec} perdas.`,'w');toast(`Stop Loss ${actualDir}`);stopBot(s);return;}
@@ -1326,13 +1347,15 @@ function trade(B){
 }
 
 // ── Histórico ──
-function addRow(s,n,et,sz,win,pd,entryPrice,entryTime,pct,elapsed){
+function addRow(s,n,et,sz,win,pd,entryPrice,entryTime,pct,elapsed,entryDiff){
   _tradeSeq++;
+  const diffStr=entryDiff!==undefined?(entryDiff>=0?'+$'+entryDiff:'$'+entryDiff):'';
+  const diffCol=entryDiff!==undefined?`<span style="color:${entryDiff>=0?'var(--up)':'var(--dn)'};font-size:8px">${diffStr}</span>`:'—';
   const tb=g('th'+s.toUpperCase());
   if(tb){
     const tr=document.createElement('tr');
     const pctCol=win?`<span style="color:var(--up)">+${pct}%</span>`:`<span style="color:var(--dn)">-100%</span>`;
-    tr.innerHTML=`<td style="color:var(--g6)">${n}</td><td style="color:var(--gold)">${et||'—'}</td><td style="color:var(--blue);font-weight:700">${entryPrice}¢ <span style="color:var(--g6);font-weight:400">@${entryTime} [${elapsed}]</span></td><td style="color:var(--g7)">$${sz}</td><td>${pctCol}</td><td class="${win?'tw':'tl'}">${win?'WIN':'LOSS'}</td><td class="${win?'tw':'tl'}">${pd>=0?'+':''}${pd.toFixed(2)}</td><td style="color:var(--g6)">${now()}</td>`;
+    tr.innerHTML=`<td style="color:var(--g6)">${n}</td><td style="color:var(--gold)">${et||'—'}</td><td style="color:var(--blue);font-weight:700">${entryPrice}¢ <span style="color:var(--g6);font-weight:400">@${entryTime} [${elapsed}]</span></td><td>${diffCol}</td><td style="color:var(--g7)">$${sz}</td><td>${pctCol}</td><td class="${win?'tw':'tl'}">${win?'WIN':'LOSS'}</td><td class="${win?'tw':'tl'}">${pd>=0?'+':''}${pd.toFixed(2)}</td>`;
     tb.insertBefore(tr,tb.firstChild);
     while(tb.children.length>50)tb.removeChild(tb.lastChild);
   }
@@ -1342,7 +1365,7 @@ function addRow(s,n,et,sz,win,pd,entryPrice,entryTime,pct,elapsed){
     const botCol=s==='u'?`<span style="color:var(--up);font-weight:700">UP↑</span>`:`<span style="color:var(--dn);font-weight:700">DN↓</span>`;
     const resCol=win?`<span style="color:var(--up)">✓</span>`:`<span style="color:var(--dn)">✗</span>`;
     const plCol=win?`<span style="color:var(--up)">+${pd.toFixed(2)}</span>`:`<span style="color:var(--dn)">${pd.toFixed(2)}</span>`;
-    cr.innerHTML=`<td style="color:var(--g6)">${_tradeSeq}</td><td>${botCol}</td><td style="color:var(--g7)">@${entryTime}</td><td style="color:var(--blue);font-weight:700">${entryPrice}¢</td><td style="color:var(--gold)">${elapsed}</td><td>${resCol}</td><td>${plCol}</td>`;
+    cr.innerHTML=`<td style="color:var(--g6)">${_tradeSeq}</td><td>${botCol}</td><td style="color:var(--g7)">@${entryTime}</td><td style="color:var(--blue);font-weight:700">${entryPrice}¢</td><td>${diffCol}</td><td style="color:var(--gold)">${elapsed}</td><td>${resCol}</td><td>${plCol}</td>`;
     tc.insertBefore(cr,tc.firstChild);
     while(tc.children.length>30)tc.removeChild(tc.lastChild);
   }
@@ -1354,6 +1377,16 @@ function updOV(s){
   if(pe){pe.textContent=(B.pnl>=0?'+':'')+B.pnl.toFixed(2);pe.style.color=B.pnl>=0?'var(--up)':'var(--dn)';}
   if(wr){const pct=B.rounds?Math.round(B.wins/B.rounds*100):0;wr.textContent=B.rounds?pct+'%':'—';wr.style.color=pct>=55?'var(--up)':pct>=45?'var(--gold)':'var(--dn)';}
   if(st){st.textContent=B.running?(B.inTrade?'⏳ EM TRADE':'RODANDO'):'PARADO';st.style.color=B.running?(B.inTrade?'var(--gold)':(s==='u'?'var(--up)':'var(--dn)')):'var(--g6)';}
+  // Update combined totals
+  const totR=BU.rounds+BD.rounds;
+  const totW=BU.wins+BD.wins;
+  const totPnl=parseFloat((BU.pnl+BD.pnl).toFixed(2));
+  const totPct=totR?Math.round(totW/totR*100):0;
+  const rEl=g('totR'),wEl=g('totW'),wrEl=g('totWR'),pEl=g('totPnl');
+  if(rEl)rEl.textContent=totR;
+  if(wEl)wEl.textContent=totW;
+  if(wrEl){wrEl.textContent=totR?totPct+'%':'—';wrEl.style.color=totPct>=55?'var(--up)':totPct>=45?'var(--gold)':'var(--dn)';}
+  if(pEl){pEl.textContent=(totPnl>=0?'+':'')+totPnl.toFixed(2)+' USDC';pEl.style.color=totPnl>=0?'var(--up)':'var(--dn)';}
 }
 
 // ── Trigger mode ──
