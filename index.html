@@ -272,10 +272,53 @@ canvas#pcU,canvas#pcD{width:100%;height:68px;display:block;}
 .div-h{display:none;}
 .drc{grid-template-columns:1fr;}
 }
+
+/* LOGIN SCREEN */
+.login-screen{position:fixed;inset:0;background:var(–g0);z-index:99999;display:flex;align-items:center;justify-content:center;}
+.login-box{background:var(–g1);border:1px solid var(–g5);border-radius:14px;padding:32px 28px;width:320px;position:relative;overflow:hidden;}
+.login-box::before{content:’’;position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(–gold),transparent);}
+.login-brand{font-family:‘Bebas Neue’,sans-serif;font-size:28px;letter-spacing:6px;color:var(–white);text-align:center;margin-bottom:4px;}
+.login-brand em{color:var(–gold);font-style:normal;}
+.login-sub{font-family:‘Space Mono’,monospace;font-size:9px;color:var(–g6);text-align:center;letter-spacing:2px;margin-bottom:28px;}
+.login-fld{display:flex;flex-direction:column;gap:5px;margin-bottom:14px;}
+.login-fld label{font-family:‘Space Mono’,monospace;font-size:8px;letter-spacing:2px;color:var(–g6);text-transform:uppercase;}
+.login-fld input{background:var(–g3);border:1px solid var(–g5);border-radius:7px;padding:10px 12px;color:var(–g9);font-family:‘Space Mono’,monospace;font-size:13px;width:100%;outline:none;transition:border-color .2s;}
+.login-fld input:focus{border-color:var(–blue);box-shadow:0 0 0 2px rgba(77,184,255,.12);}
+.login-btn{width:100%;padding:13px;border-radius:7px;border:none;background:linear-gradient(135deg,var(–up2),#009966);color:#000;font-family:‘Bebas Neue’,sans-serif;font-size:16px;letter-spacing:3px;cursor:pointer;margin-top:6px;transition:transform .15s;}
+.login-btn:hover{transform:translateY(-1px);}
+.login-err{font-family:‘Space Mono’,monospace;font-size:9px;color:var(–dn);text-align:center;margin-top:10px;min-height:14px;}
+.login-user{font-family:‘Space Mono’,monospace;font-size:8px;color:var(–g6);position:fixed;top:14px;right:14px;z-index:99998;display:flex;align-items:center;gap:6px;}
+.login-user span{color:var(–gold);}
+.logout-btn{background:var(–g3);border:1px solid var(–g5);border-radius:4px;padding:2px 8px;color:var(–g6);font-family:‘Space Mono’,monospace;font-size:8px;cursor:pointer;}
+.logout-btn:hover{color:var(–dn);border-color:var(–dn);}
 </style>
 
 </head>
 <body>
+
+<!-- LOGIN SCREEN -->
+
+<div class="login-screen" id="loginScreen">
+  <div class="login-box">
+    <div class="login-brand">MASTER<em>BOT</em></div>
+    <div class="login-sub">Trading Platform · Acesso Restrito</div>
+    <div class="login-fld">
+      <label>Login</label>
+      <input type="text" id="loginUser" placeholder="Seu login" autocomplete="off" autocapitalize="off">
+    </div>
+    <div class="login-fld">
+      <label>Senha</label>
+      <input type="password" id="loginPass" placeholder="Sua senha" onkeydown="if(event.key==='Enter')doLogin()">
+    </div>
+    <button class="login-btn" onclick="doLogin()">ENTRAR</button>
+    <div class="login-err" id="loginErr"></div>
+  </div>
+</div>
+<!-- LOGGED USER BADGE -->
+<div class="login-user" id="userBadge" style="display:none">
+  Logado como <span id="userBadgeName">—</span>
+  <button class="logout-btn" onclick="doLogout()">Sair</button>
+</div>
 
 <!-- TOPBAR -->
 
@@ -510,7 +553,7 @@ canvas#pcU,canvas#pcD{width:100%;height:68px;display:block;}
               <div style="font-family:'Space Mono',monospace;font-size:8px;" id="ptStatusU"><span style="color:var(--g6)">Aguardando...</span></div>
             </div>
             <div id="taFU" style="display:none">
-              <div class="fld"><label>Variação acima de ($)</label><div class="fr"><input type="number" id="tavU" value="80" min="0" step="10"><span class="fu2">$</span></div><div class="fh">Entra se BTC subiu ≥ $80 desde abertura do período</div></div>
+              <div class="fld"><label>Variação acima de ($)</label><div class="fr"><input type="number" id="tavU" value="80" min="0" step="10"><span class="fu2">$</span></div><div class="fh">UP: entra se BTC atual ≥ ref + $X (ex: ref $72.000 + $50 = alvo $72.050)</div></div>
             </div>
             <div class="trs" id="tsU"><span style="color:var(--g6)">Aguardando dados...</span></div>
           </div>
@@ -630,7 +673,7 @@ canvas#pcU,canvas#pcD{width:100%;height:68px;display:block;}
               <div style="font-family:'Space Mono',monospace;font-size:8px;" id="ptStatusD"><span style="color:var(--g6)">Aguardando...</span></div>
             </div>
             <div id="taFD" style="display:none">
-              <div class="fld"><label>Variação abaixo de ($)</label><div class="fr"><input type="number" id="tavD" value="80" min="0" step="10"><span class="fu2">$</span></div><div class="fh">Entra se BTC caiu ≥ $80 desde abertura do período</div></div>
+              <div class="fld"><label>Variação abaixo de ($)</label><div class="fr"><input type="number" id="tavD" value="80" min="0" step="10"><span class="fu2">$</span></div><div class="fh">DOWN: entra se BTC atual ≤ ref − $X (ex: ref $72.000 − $50 = alvo $71.950)</div></div>
             </div>
             <div class="trs" id="tsD"><span style="color:var(--g6)">Aguardando dados...</span></div>
           </div>
@@ -1050,8 +1093,14 @@ function updTS(s){
   if(m==='abs'||m==='both'){
     const delta=gf(s==='u'?'tavU':'tavD');
     if(!isNaN(delta)&&delta>0){
-      const ok=s==='u'?diff>=delta:diff<=-delta;
-      msgs.push(`<span style="color:${ok?'var(--up)':'var(--g7)'}">Δ$: ${diff>=0?'+':''}$${diff.toFixed(0)} (need ${s==='u'?'≥+':'≤-'}$${delta}) ${ok?'✓':'✗'}</span>`);
+      // UP: entra se atual >= ref + delta
+      // DOWN: entra se atual <= ref - delta
+      const target=s==='u'?ref+delta:ref-delta;
+      const ok=s==='u'?E.price>=target:E.price<=target;
+      const arrow=s==='u'?'↑':'↓';
+      msgs.push(`<span style="color:${ok?'var(--up)':'var(--g7)'}">
+        Alvo ${arrow}: $${target.toFixed(0)} · atual: $${E.price.toFixed(0)} · Δ: ${diff>=0?'+':''}$${diff.toFixed(0)} ${ok?'✓':'✗'}
+      </span>`);
     } else {
       msgs.push(`<span style="color:var(--dn)">⚠ Insira valor absoluto $</span>`);
     }
@@ -1079,8 +1128,11 @@ function trigOK(s){
   }
   if(m==='abs'||m==='both'){
     const delta=gf(s==='u'?'tavU':'tavD');
-    if(isNaN(delta)||delta<=0)return false; // sem valor configurado = não dispara
-    aOk=s==='u'?diff>=delta:diff<=-delta;
+    if(isNaN(delta)||delta<=0)return false;
+    // UP: atual >= ref + delta (BTC superou o alvo acima)
+    // DOWN: atual <= ref - delta (BTC caiu abaixo do alvo)
+    const target=s==='u'?ref+delta:ref-delta;
+    aOk=s==='u'?E.price>=target:E.price<=target;
   }
   if(m==='pct')return pOk;
   if(m==='abs')return aOk;
@@ -1254,9 +1306,11 @@ function trade(B){
     const delta=gf(s==='u'?'tavU':'tavD');
     if(isNaN(delta)||delta<=0){trigPass=false;parts.push('<span style="color:var(--dn)">sem $</span>');}
     else{
-      const ok=s==='u'?diff>=delta:diff<=-delta;
+      const target=s==='u'?ref+delta:ref-delta;
+      const ok=s==='u'?E.price>=target:E.price<=target;
       if(!ok)trigPass=false;
-      parts.push('<span style="color:'+(ok?'var(--up)':'var(--dn)').toString()+'">'+(ok?'✓':'✗')+' $:'+(diff>=0?'+':'')+diff.toFixed(0)+' /'+(s==='u'?'+':'-')+delta+'</span>');
+      const arrow=s==='u'?'↑':'↓';
+      parts.push('<span style="color:'+(ok?'var(--up)':'var(--dn)').toString()+'">'+(ok?'✓':'✗')+' alvo'+arrow+':$'+target.toFixed(0)+' atual:$'+E.price.toFixed(0)+'</span>');
     }
   }
   if(diagEl)diagEl.innerHTML=parts.join(' · ');
@@ -1602,7 +1656,55 @@ window.addEventListener('pointermove',e=>{
 window.addEventListener('pointerup',()=>{_drag=false;});
 window.addEventListener('resize',()=>{drawEC();drawPC('u');drawPC('d');});
 
+
+// ── LOGIN ──
+const USERS={
+  'ak':'ak21',
+  'luca':'lg00'
+};
+const DISPLAY={'ak':'AK','luca':'Luca'};
+
+function doLogin(){
+  const user=(g('loginUser').value||'').trim().toLowerCase();
+  const pass=(g('loginPass').value||'').trim().toLowerCase();
+  const errEl=g('loginErr');
+  if(!user||!pass){errEl.textContent='Preencha login e senha.';return;}
+  if(USERS[user]&&USERS[user]===pass){
+    // Success
+    g('loginScreen').style.display='none';
+    g('userBadge').style.display='flex';
+    g('userBadgeName').textContent=DISPLAY[user]||user;
+    sessionStorage.setItem('mb_user',user);
+    errEl.textContent='';
+    log(`Bem-vindo, ${DISPLAY[user]||user}!`,'s');
+  } else {
+    errEl.textContent='Login ou senha incorretos.';
+    g('loginPass').value='';
+    g('loginPass').focus();
+  }
+}
+function doLogout(){
+  sessionStorage.removeItem('mb_user');
+  g('loginScreen').style.display='flex';
+  g('userBadge').style.display='none';
+  g('loginUser').value='';g('loginPass').value='';
+  g('loginErr').textContent='';
+  g('loginUser').focus();
+}
+function checkSession(){
+  const user=sessionStorage.getItem('mb_user');
+  if(user&&USERS[user]){
+    g('loginScreen').style.display='none';
+    g('userBadge').style.display='flex';
+    g('userBadgeName').textContent=DISPLAY[user]||user;
+  } else {
+    g('loginScreen').style.display='flex';
+    setTimeout(()=>g('loginUser').focus(),100);
+  }
+}
+
 // ── Init ──
+checkSession();
 connectWS();
 updateMarketDisplays();
 // Load saved config and history after DOM is ready
