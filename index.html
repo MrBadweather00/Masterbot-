@@ -184,6 +184,9 @@ color:var(–txt2);display:flex;align-items:center;gap:6px;
 .dr-body::-webkit-scrollbar{width:3px;}
 .dr-body::-webkit-scrollbar-thumb{background:var(–b2);}
 .dr-cols{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.dr-col{overflow-y:auto;padding-right:4px;scrollbar-width:thin;scrollbar-color:var(–b2) transparent;}
+.dr-col::-webkit-scrollbar{width:3px;}
+.dr-col::-webkit-scrollbar-thumb{background:var(–b2);}
 @media(max-width:640px){.dr-cols{grid-template-columns:1fr;}.split{flex-direction:column;}.split-l{border-right:none;border-bottom:1px solid var(–b1);max-height:46vh;}.divider{display:none;}}
 
 /* ─── CARDS & SECTIONS ─────────────────────────────────── */
@@ -585,7 +588,7 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
           <div class="hero-top">
             <div>
               <div class="hero-asset" id="heroAsset">BITCOIN / USDT</div>
-              <div class="hero-src"><div class="src-dot" style="background:#f0b90b"></div>BINANCE STREAM</div>
+              <div class="hero-src"><div class="src-dot" style="background:#f0b90b" id="srcDot"></div><span id="srcLabel">BINANCE STREAM</span></div>
             </div>
             <div style="font-family:'JetBrains Mono',monospace;font-size:7px;color:var(--txt3)" id="tickCount">0 ticks</div>
           </div>
@@ -759,7 +762,7 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
       </div>
       <div class="dr-cols">
         <!-- LEFT COL -->
-        <div>
+        <div class="dr-col">
           <div class="sec">🔐 API Polymarket</div>
           <div class="api-card">
             <div class="api-card-title">🔐 CREDENCIAIS — compartilhadas UP e DOWN</div>
@@ -866,7 +869,21 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
       </div>
     </div>
     <!-- RIGHT COL -->
-    <div>
+    <div class="dr-col">
+      <!-- BOTÕES START — topo da coluna direita, sempre visíveis -->
+      <div style="position:sticky;top:0;z-index:10;background:var(--bg3);border-radius:10px;padding:8px;margin-bottom:10px;border:1px solid var(--b2);">
+        <div style="display:flex;gap:6px;margin-bottom:6px;">
+          <button class="btn btn-su" id="bsU" onclick="startBot('u')" style="flex:1;padding:12px">▶ START UP ↑</button>
+          <button class="btn btn-stop-u" id="bxU" onclick="stopBot('u')" style="display:none;flex:1;padding:12px">⏹ STOP</button>
+          <button class="btn btn-reset" onclick="resetBot('u')" style="flex:0 0 auto;padding:12px 14px">↺</button>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;padding:4px 2px;">
+          <div class="sdot" id="dotU" style="background:var(--txt3)"></div>
+          <span style="color:var(--txt3);font-family:'JetBrains Mono',monospace;font-size:7px;flex:1" id="stxtU">Parado</span>
+          <span style="color:var(--txt3);font-family:'JetBrains Mono',monospace;font-size:7px" id="tsiU">—</span>
+        </div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:7px;color:var(--gold);padding:2px;min-height:14px" id="diagU">—</div>
+      </div>
       <div class="sec">💰 Tamanho & Rounds</div>
       <div class="card">
         <div class="g3">
@@ -945,18 +962,6 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
     </div>
   </div>
 </div>
-<div class="diag-bar" id="diagU">—</div>
-<div class="status-row">
-  <div class="sdot" id="dotU" style="background:var(--txt3)"></div>
-  <span style="color:var(--txt3)" id="stxtU">Parado</span>
-  <span style="flex:1"></span>
-  <span style="color:var(--txt3);font-family:'JetBrains Mono',monospace;font-size:7px" id="tsiU">—</span>
-</div>
-<div class="bot-btns">
-  <button class="btn btn-su" id="bsU" onclick="startBot('u')">▶ START UP ↑</button>
-  <button class="btn btn-stop-u" id="bxU" onclick="stopBot('u')" style="display:none">⏹ STOP</button>
-  <button class="btn btn-reset" onclick="resetBot('u')">↺</button>
-</div>
 ```
 
   </div>
@@ -983,7 +988,7 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
       </div>
       <div class="dr-cols">
         <!-- LEFT COL -->
-        <div>
+        <div class="dr-col">
           <div class="sec">🔐 API Compartilhada</div>
           <div class="card" style="padding:9px">
             <div style="font-family:'JetBrains Mono',monospace;font-size:7px;color:var(--gold);margin-bottom:5px">🔐 USA CREDENCIAIS DO DRBOT UP</div>
@@ -1081,7 +1086,21 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
       </div>
     </div>
     <!-- RIGHT COL -->
-    <div>
+    <div class="dr-col">
+      <!-- BOTÕES START — topo da coluna direita, sempre visíveis -->
+      <div style="position:sticky;top:0;z-index:10;background:var(--bg3);border-radius:10px;padding:8px;margin-bottom:10px;border:1px solid var(--b2);">
+        <div style="display:flex;gap:6px;margin-bottom:6px;">
+          <button class="btn btn-sd" id="bsD" onclick="startBot('d')" style="flex:1;padding:12px">▶ START DOWN ↓</button>
+          <button class="btn btn-stop-d" id="bxD" onclick="stopBot('d')" style="display:none;flex:1;padding:12px">⏹ STOP</button>
+          <button class="btn btn-reset" onclick="resetBot('d')" style="flex:0 0 auto;padding:12px 14px">↺</button>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;padding:4px 2px;">
+          <div class="sdot" id="dotD" style="background:var(--txt3)"></div>
+          <span style="color:var(--txt3);font-family:'JetBrains Mono',monospace;font-size:7px;flex:1" id="stxtD">Parado</span>
+          <span style="color:var(--txt3);font-family:'JetBrains Mono',monospace;font-size:7px" id="tsiD">—</span>
+        </div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:7px;color:var(--gold);padding:2px;min-height:14px" id="diagD">—</div>
+      </div>
       <div class="sec">💰 Tamanho & Rounds</div>
       <div class="card">
         <div class="g3">
@@ -1160,18 +1179,6 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
     </div>
   </div>
 </div>
-<div class="diag-bar" id="diagD">—</div>
-<div class="status-row">
-  <div class="sdot" id="dotD" style="background:var(--txt3)"></div>
-  <span style="color:var(--txt3)" id="stxtD">Parado</span>
-  <span style="flex:1"></span>
-  <span style="color:var(--txt3);font-family:'JetBrains Mono',monospace;font-size:7px" id="tsiD">—</span>
-</div>
-<div class="bot-btns">
-  <button class="btn btn-sd" id="bsD" onclick="startBot('d')">▶ START DOWN ↓</button>
-  <button class="btn btn-stop-d" id="bxD" onclick="stopBot('d')" style="display:none">⏹ STOP</button>
-  <button class="btn btn-reset" onclick="resetBot('d')">↺</button>
-</div>
 ```
 
   </div>
@@ -1191,6 +1198,7 @@ const BU={dir:'u',running:false,rounds:0,wins:0,losses:0,pnl:0,consec:0,_last:nu
 const BD={dir:'d',running:false,rounds:0,wins:0,losses:0,pnl:0,consec:0,_last:null,pnlHist:[0],inTrade:false,periodOpen:null,periodStart:null};
 const TM={u:'abs',d:'abs'}; // default: Valor Absoluto
 let _gLock=false; // global trade lock
+function _checkLock(){_gLock=BU.inTrade||BD.inTrade;} // sincroniza lock com estado real
 let _seq=0; // combined history sequence
 let _audioCtx=null,_wakeLock=null,_lastTick=Date.now();
 
@@ -1291,12 +1299,20 @@ function onTick(price,ts){
     }
   });
 
-  renderPrice();renderMkt();renderEdge();drawEChart();
+  renderPrice();renderMkt();renderEdge();drawEChart();updSrcLabel();
   updTrigStatus('u');updTrigStatus('d');
   if(BU.running&&!BU.inTrade&&!_gLock)executeTrade(BU);
   if(BD.running&&!BD.inTrade&&!_gLock)executeTrade(BD);
 }
 
+// ── Source label ──
+function updSrcLabel(){
+  const tfU=gv('tfU')||'15m',tfD=gv('tfD')||'15m';
+  const usesChainlink=tfU==='5m'||tfU==='15m'||tfD==='5m'||tfD==='15m';
+  const lbl=g('srcLabel');const dot=g('srcDot');
+  if(lbl)lbl.textContent=usesChainlink?'BINANCE STREAM + CHAINLINK REF':'BINANCE STREAM';
+  if(dot)dot.style.background=usesChainlink?'#375bd2':'#f0b90b';
+}
 // ── Render ──
 function renderPrice(){
   const el=g('heroPrice'),dir=E.prev?(E.price>E.prev?'up':'dn'):'';
@@ -1328,8 +1344,11 @@ function renderEdge(){
   if(E.hist.length<win)return;
   const sl=E.hist.slice(-win).map(x=>x.p);
   const mom=(sl[sl.length-1]-sl[0])/sl[0];
-  const MAX=0.003,norm=Math.max(0,Math.min(1,(mom+MAX)/(2*MAX))),nm=norm-0.5;
-  const upT=gf('upThresh')||0.05,dnT=gf('dnThresh')||0.05;
+  // MAX escala com o threshold para melhor sensibilidade
+  const upT2=gf('upThresh')||0.05,dnT2=gf('dnThresh')||0.05;
+  const MAX=Math.max(0.001,Math.max(upT2,dnT2)*0.006);
+  const norm=Math.max(0,Math.min(1,(mom+MAX)/(2*MAX))),nm=norm-0.5;
+  const upT=upT2,dnT=dnT2;
   let sig,cls,lbl,col;
   if(nm>upT){sig='sup';cls='edge-sup';lbl='🟢 FORTE UP';col='var(--up)';}
   else if(nm>0.02){sig='wup';cls='edge-wup';lbl='🟡 FRACO UP';col='var(--up2)';}
@@ -1531,14 +1550,15 @@ function isPeriodTimeOK(s){
   const elapsed=getPeriodElapsed(s);
   const startMin=parseInt(gv('ptMin'+SU))||0;
   const startSec=parseInt(gv('ptSec'+SU))||0;
-  const endMin=parseInt(gv('ptMinEnd'+SU))||0;
-  const endSec=parseInt(gv('ptSecEnd'+SU))||0;
+  const endMin=parseInt(gv('ptMinEnd'+SU));
+  const endSec=parseInt(gv('ptSecEnd'+SU));
   const startTotal=startMin*60+startSec;
-  const endTotal=endMin*60+endSec;
-  // If both are 0, no restriction
+  // Se end=0:0 e start=0:0 → sem restrição
+  if(isNaN(endMin)&&isNaN(endSec)&&startTotal===0)return true;
+  const endTotal=(endMin||0)*60+(endSec||0);
   if(startTotal===0&&endTotal===0)return true;
-  // If end <= start, treat as no restriction
-  if(endTotal>0&&endTotal<=startTotal)return true;
+  // end deve ser maior que start para ser válido
+  if(endTotal>0&&endTotal<=startTotal)return false;
   const ok=elapsed>=startTotal&&(endTotal===0||elapsed<=endTotal);
   return ok;
 }
@@ -1563,6 +1583,7 @@ setInterval(updatePeriodStatus,1000);
 // ── TRADE ENGINE ──
 function executeTrade(B){
   const s=B.dir;
+  _checkLock(); // garante que lock reflete estado real
   if(!E.price||B.inTrade||_gLock)return;
   const dl=Math.max(5,gi(s==='u'?'dlU':'dlD')||5)*1000;
   if(B._last&&Date.now()-B._last<dl)return;
@@ -1621,15 +1642,15 @@ function executeTrade(B){
   else if(effectiveDir==='down'&&sig==='sdn')wp=0.66;
   else if(effectiveDir==='down'&&sig==='wdn')wp=0.58;
 
-  // Simulate polyP within configured range
-  const polyP=parseFloat((mn+Math.random()*(mx-mn)).toFixed(2));
+  // PolyP: centro do range configurado (simulação), garantido dentro de mn..mx
+  const polyP=parseFloat(((mn+mx)/2).toFixed(2));
   const actualDir=effectiveDir==='up'?'UP':'DOWN';
   const et=strong?(effectiveDir==='up'?'⚡↑':'⚡↓'):'';
   const tag=apiConfigured()?'[REAL]':'[SIM]';
   const entryTime=now();
 
   // ENTER — lock
-  _gLock=true;B.inTrade=true;B._last=Date.now();B.rounds++;
+  _gLock=true;B.inTrade=true;B.rounds++;
   const secsLeft=Math.round(dur/1000);
   const ml=Math.floor(secsLeft/60),sl2=String(secsLeft%60).padStart(2,'0');
   log(`${tag} ${actualDir} #${B.rounds} ${et} ENTRADA ${Math.round(polyP*100)}¢ @${entryTime} · Δ${entryDiff>=0?'+':''}$${entryDiff} · fecha em ${ml}:${sl2}`,'w');
@@ -1651,9 +1672,8 @@ function executeTrade(B){
     B.pnl=parseFloat((B.pnl+pd).toFixed(2));
     B.pnlHist.push(B.pnl);
     if(win){B.wins++;B.consec=0;}else{B.losses++;B.consec++;}
-    B.inTrade=false;_gLock=false;
-    // Reset period ref after round
-    B.periodOpen=E.price;B.periodStart=Date.now();
+    B.inTrade=false;_gLock=false;B._last=Date.now();
+    // periodOpen mantido — só muda quando novo período começa (gerenciado em onTick)
 
     const pct=(win?(profit/sz*100):-100).toFixed(1);
     if(win)log(`${tag} ${actualDir} #${B.rounds} ✓ +${profit.toFixed(2)} USDC (+${pct}%) · ref:$${periodRefAtEntry.toFixed(0)} final:$${finalPrice.toFixed(0)} diff:${finalDiff>=0?'+':''}$${finalDiff.toFixed(0)}`,'s');
@@ -1919,7 +1939,8 @@ function loadConfig(){
         const vu=id==='slipU'?'slipVU':id==='slipD'?'slipVD':id==='momWin'?'momWinVal':null;
         if(vu){const ve=g(vu);if(ve)ve.textContent=el.value+(id.startsWith('slip')?'%':'');}
       }
-      if(el.type==='checkbox')el.dispatchEvent(new Event('change'));
+      // só dispara change em checkboxes que controlam seções de UI
+      if(el.type==='checkbox'&&['twU','twD','tpEnU','tpEnD','slU','slD'].includes(id))el.dispatchEvent(new Event('change'));
     });
     if(cfg.TM_u)setTM('u',cfg.TM_u);
     if(cfg.TM_d)setTM('d',cfg.TM_d);
@@ -1955,7 +1976,7 @@ function loadHistory(){
     if(d.d)Object.assign(BD,{rounds:d.d.rounds,wins:d.d.wins,losses:d.d.losses,pnl:d.d.pnl,pnlHist:d.d.pnlHist,consec:d.d.consec});
     const restoreTable=(id,rows)=>{const tb=g(id);if(!tb||!rows)return;tb.innerHTML='';rows.forEach(r=>{const tr=document.createElement('tr');tr.innerHTML=r;tb.appendChild(tr);});};
     restoreTable('thU',d.rowsU);restoreTable('thD',d.rowsD);restoreTable('thCombined',d.rowsC);
-    updOV('u');updOV('d');
+    updOV('u');updOV('d');drawPnlChart('u');drawPnlChart('d');
     const ago=Math.round((Date.now()-d.ts)/60000);
     log(`📂 Histórico restaurado · ${_seq} trades · salvo há ${ago<1?'<1':ago}min`,'i');
   }catch(e){log('📂 Sem histórico salvo — sessão nova.','i');}
