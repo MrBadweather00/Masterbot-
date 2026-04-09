@@ -314,14 +314,11 @@ canvas#pcU,canvas#pcD{width:100%;height:68px;display:block;}
     <div class="login-err" id="loginErr"></div>
   </div>
 </div>
-<!-- LOGGED USER BADGE -->
-<div class="login-user" id="userBadge" style="display:none">
-  Logado como <span id="userBadgeName">—</span>
-  <button class="logout-btn" onclick="doLogout()">Sair</button>
-</div>
 
+<!-- APP (hidden until login) -->
+
+<div id="appWrapper" style="display:none;flex:1;display:none;flex-direction:column;overflow:hidden;height:100%;">
 <!-- TOPBAR -->
-
 <div class="topbar">
   <div class="brand">MASTER<em>BOT</em><sup>v3</sup></div>
   <div class="chips" id="chips">
@@ -332,6 +329,11 @@ canvas#pcU,canvas#pcD{width:100%;height:68px;display:block;}
     <div class="chip" data-sym="XRPUSDT" data-lbl="XRP">XRP</div>
   </div>
   <div class="tr">
+    <div id="userChip" style="display:none;align-items:center;gap:6px;padding:3px 10px;border-radius:20px;background:rgba(245,200,66,.1);border:1px solid rgba(245,200,66,.25);">
+      <div style="width:22px;height:22px;border-radius:50%;background:linear-gradient(135deg,var(--gold2),var(--gold));display:flex;align-items:center;justify-content:center;font-family:'Bebas Neue',sans-serif;font-size:11px;color:#000;font-weight:700;" id="userAvatar">?</div>
+      <span style="font-family:'Space Mono',monospace;font-size:9px;color:var(--gold);font-weight:700;" id="userChipName">—</span>
+      <button onclick="doLogout()" style="background:none;border:none;color:var(--g6);font-size:10px;cursor:pointer;padding:0 2px;" title="Sair">✕</button>
+    </div>
     <div class="sim-tag" id="simTag">SIM</div>
     <div class="ws-pill wait" id="wsPill"><div class="wsd"></div><span id="wsLbl">CONECTANDO</span></div>
   </div>
@@ -724,6 +726,7 @@ canvas#pcU,canvas#pcD{width:100%;height:68px;display:block;}
 </div>
 
 <div class="toast" id="toast"></div>
+</div><!-- end appWrapper -->
 
 <script>
 // ══════════════════════════════════════════
@@ -1664,18 +1667,31 @@ const USERS={
 };
 const DISPLAY={'ak':'AK','luca':'Luca'};
 
+function showApp(user){
+  g('loginScreen').style.display='none';
+  g('appWrapper').style.display='flex';
+  // User chip in topbar
+  const chip=g('userChip');
+  if(chip)chip.style.display='flex';
+  const name=DISPLAY[user]||user;
+  const av=g('userAvatar');if(av)av.textContent=name.charAt(0).toUpperCase();
+  const cn=g('userChipName');if(cn)cn.textContent=name;
+  sessionStorage.setItem('mb_user',user);
+}
+function hideApp(){
+  g('appWrapper').style.display='none';
+  g('loginScreen').style.display='flex';
+  const chip=g('userChip');if(chip)chip.style.display='none';
+  sessionStorage.removeItem('mb_user');
+}
 function doLogin(){
   const user=(g('loginUser').value||'').trim().toLowerCase();
   const pass=(g('loginPass').value||'').trim().toLowerCase();
   const errEl=g('loginErr');
   if(!user||!pass){errEl.textContent='Preencha login e senha.';return;}
   if(USERS[user]&&USERS[user]===pass){
-    // Success
-    g('loginScreen').style.display='none';
-    g('userBadge').style.display='flex';
-    g('userBadgeName').textContent=DISPLAY[user]||user;
-    sessionStorage.setItem('mb_user',user);
     errEl.textContent='';
+    showApp(user);
     log(`Bem-vindo, ${DISPLAY[user]||user}!`,'s');
   } else {
     errEl.textContent='Login ou senha incorretos.';
@@ -1684,36 +1700,39 @@ function doLogin(){
   }
 }
 function doLogout(){
-  sessionStorage.removeItem('mb_user');
-  g('loginScreen').style.display='flex';
-  g('userBadge').style.display='none';
+  hideApp();
   g('loginUser').value='';g('loginPass').value='';
   g('loginErr').textContent='';
-  g('loginUser').focus();
+  setTimeout(()=>g('loginUser').focus(),100);
 }
 function checkSession(){
   const user=sessionStorage.getItem('mb_user');
   if(user&&USERS[user]){
-    g('loginScreen').style.display='none';
-    g('userBadge').style.display='flex';
-    g('userBadgeName').textContent=DISPLAY[user]||user;
+    showApp(user);
   } else {
-    g('loginScreen').style.display='flex';
-    setTimeout(()=>g('loginUser').focus(),100);
+    hideApp();
+    setTimeout(()=>{const el=g('loginUser');if(el)el.focus();},200);
   }
 }
 
 // ── Init ──
+// checkSession runs first — shows login or app immediately
 checkSession();
-connectWS();
-updateMarketDisplays();
-// Load saved config and history after DOM is ready
-setTimeout(()=>{
-  loadConfig();
-  loadHistory();
-  setupAutoSave();
-  drawPC('u');drawPC('d');
-},300);
+// Only start bot systems if already logged in
+if(sessionStorage.getItem('mb_user')){
+  connectWS();
+  updateMarketDisplays();
+  setTimeout(()=>{loadConfig();loadHistory();setupAutoSave();drawPC('u');drawPC('d');},300);
+} else {
+  // Start WS after login
+  const _origShowApp=showApp;
+  showApp=function(user){
+    _origShowApp(user);
+    connectWS();
+    updateMarketDisplays();
+    setTimeout(()=>{loadConfig();loadHistory();setupAutoSave();drawPC('u');drawPC('d');},300);
+  };
+}
 </script>
 
 </body>
