@@ -8,13 +8,13 @@
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=JetBrains+Mono:wght@400;600;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
 :root{
-  --bg0:#0a0c0e;--bg1:#0f1214;--bg2:#141719;--bg3:#1a1e21;--bg4:#202428;--bg5:#272c30;
-  --b1:#1e2428;--b2:#2a3038;--b3:#354048;
+  --bg0:#181c20;--bg1:#1e2329;--bg2:#242a30;--bg3:#2a3038;--bg4:#303840;--bg5:#384048;
+  --b1:#2a3038;--b2:#354048;--b3:#404c58;
   --up:#00e5a0;--up2:#00b87a;--up3:rgba(0,229,160,.12);
   --dn:#ff3b5c;--dn2:#cc1a3a;--dn3:rgba(255,59,92,.12);
   --gold:#f0b429;--gold2:#c8891a;--gold3:rgba(240,180,41,.12);
   --blue:#3b9eff;--blue2:#1a7fd4;--blue3:rgba(59,158,255,.12);
-  --txt:#7a9ab5;--txt2:#4a6a85;--txt3:#253545;--white:#cce4f7;
+  --txt:#8ab0cc;--txt2:#5a7a99;--txt3:#3a5570;--white:#d8eeff;
 }
 *{box-sizing:border-box;margin:0;padding:0;}
 html,body{height:100%;overflow:hidden;}
@@ -24,7 +24,7 @@ body::after{content:'';position:fixed;inset:0;pointer-events:none;z-index:9998;b
 /* ─── LOGIN ─────────────────────────────────── */
 #loginScreen{
 position:fixed;inset:0;z-index:10000;
-background:var(–bg0);
+background:#111518; /* sólido — jamais translúcido */
 display:flex;align-items:center;justify-content:center;
 }
 .login-box{
@@ -454,6 +454,13 @@ color:var(–txt3);cursor:pointer;transition:all .15s;
 }
 .day-btn.active{background:var(–blue3);border-color:var(–blue2);color:var(–blue);}
 
+/* ─── PERIOD TIME WINDOW ─────────────────────── */
+.period-sts{
+margin-top:5px;padding:5px 7px;
+background:var(–bg3);border-radius:5px;
+font-family:‘JetBrains Mono’,monospace;font-size:7px;
+color:var(–txt3);
+}
 /* ─── MISC ─────────────────────────────────── */
 .ow-badge{
 display:inline-flex;align-items:center;gap:4px;
@@ -470,9 +477,11 @@ padding:6px 10px;border-radius:8px;margin-bottom:8px;
 .dir-lbl{font-family:‘Bebas Neue’,sans-serif;font-size:15px;letter-spacing:3px;}
 .ul{color:var(–up);}.dl{color:var(–dn);}
 .dir-sub{font-family:‘JetBrains Mono’,monospace;font-size:7px;color:var(–txt3);}
-@keyframes tf{0%{opacity:.7}100%{opacity:0}}
-.tflash{position:fixed;inset:0;pointer-events:none;z-index:500;animation:tf .5s ease-out forwards;}
-.tfu{background:rgba(0,229,160,.06);}.tfd{background:rgba(255,59,92,.06);}
+@keyframes tf-win{0%{opacity:1}40%{opacity:.8}100%{opacity:0}}
+@keyframes tf-lose{0%{opacity:1}40%{opacity:.7}100%{opacity:0}}
+.tflash{position:fixed;inset:0;pointer-events:none;z-index:500;}
+.tfu{background:radial-gradient(ellipse at center,rgba(0,229,160,.35) 0%,rgba(0,229,160,.12) 40%,transparent 70%);animation:tf-win .7s ease-out forwards;}
+.tfd{background:radial-gradient(ellipse at center,rgba(255,59,92,.35) 0%,rgba(255,59,92,.12) 40%,transparent 70%);animation:tf-lose .7s ease-out forwards;}
 .toast{
 position:fixed;bottom:20px;left:50%;
 transform:translateX(-50%) translateY(80px);
@@ -772,6 +781,29 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
         </div>
         <!-- Trig status display -->
         <div style="margin-top:6px;padding:5px 7px;background:var(--bg3);border-radius:5px;font-family:'JetBrains Mono',monospace;font-size:7px;" id="tsU"><span style="color:var(--txt3)">Aguardando dados...</span></div>
+        <!-- Period time window -->
+        <div style="margin-top:8px;padding:8px;background:var(--bg3);border-radius:7px;border:1px solid var(--b1);">
+          <div style="font-family:'JetBrains Mono',monospace;font-size:7px;color:var(--txt3);letter-spacing:1px;margin-bottom:6px;">⏱ JANELA DENTRO DO PERÍODO</div>
+          <div class="g2">
+            <div class="fld"><label>Entrar após (mm:ss)</label>
+              <div class="fld-row">
+                <input type="number" id="ptMinU" value="0" min="0" max="59" style="width:44px">
+                <span class="fld-unit">:</span>
+                <input type="number" id="ptSecU" value="10" min="0" max="59" style="width:44px">
+              </div>
+              <div class="fld-hint">Ex: 0:10 = 10s após início</div>
+            </div>
+            <div class="fld"><label>Parar de entrar (mm:ss)</label>
+              <div class="fld-row">
+                <input type="number" id="ptMinEndU" value="4" min="0" max="59" style="width:44px">
+                <span class="fld-unit">:</span>
+                <input type="number" id="ptSecEndU" value="0" min="0" max="59" style="width:44px">
+              </div>
+              <div class="fld-hint">Ex: 4:00 = até 4min do período</div>
+            </div>
+          </div>
+          <div class="period-sts" id="ptStU">Aguardando...</div>
+        </div>
       </div>
     </div>
     <!-- RIGHT COL -->
@@ -966,6 +998,27 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
           </div>
         </div>
         <div style="margin-top:6px;padding:5px 7px;background:var(--bg3);border-radius:5px;font-family:'JetBrains Mono',monospace;font-size:7px;" id="tsD"><span style="color:var(--txt3)">Aguardando dados...</span></div>
+        <!-- Period time window -->
+        <div style="margin-top:8px;padding:8px;background:var(--bg3);border-radius:7px;border:1px solid var(--b1);">
+          <div style="font-family:'JetBrains Mono',monospace;font-size:7px;color:var(--txt3);letter-spacing:1px;margin-bottom:6px;">⏱ JANELA DENTRO DO PERÍODO</div>
+          <div class="g2">
+            <div class="fld"><label>Entrar após (mm:ss)</label>
+              <div class="fld-row">
+                <input type="number" id="ptMinD" value="0" min="0" max="59" style="width:44px">
+                <span class="fld-unit">:</span>
+                <input type="number" id="ptSecD" value="10" min="0" max="59" style="width:44px">
+              </div>
+            </div>
+            <div class="fld"><label>Parar de entrar (mm:ss)</label>
+              <div class="fld-row">
+                <input type="number" id="ptMinEndD" value="4" min="0" max="59" style="width:44px">
+                <span class="fld-unit">:</span>
+                <input type="number" id="ptSecEndD" value="0" min="0" max="59" style="width:44px">
+              </div>
+            </div>
+          </div>
+          <div class="period-sts" id="ptStD">Aguardando...</div>
+        </div>
       </div>
     </div>
     <!-- RIGHT COL -->
@@ -1098,7 +1151,14 @@ function log(msg,t=''){
   while(b.children.length>150)b.removeChild(b.firstChild);
 }
 function toast(msg){const t=g('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2800);}
-function flash(win){const d=document.createElement('div');d.className='tflash '+(win?'tfu':'tfd');document.body.appendChild(d);setTimeout(()=>d.remove(),600);}
+function flash(win){
+  const d=document.createElement('div');d.className='tflash '+(win?'tfu':'tfd');
+  document.body.appendChild(d);setTimeout(()=>d.remove(),800);
+  // Border pulse on body
+  document.body.style.outline='2px solid '+(win?'rgba(0,229,160,.6)':'rgba(255,59,92,.6)');
+  document.body.style.outlineOffset='-2px';
+  setTimeout(()=>{document.body.style.outline='none';document.body.style.outlineOffset='';},600);
+}
 setInterval(()=>{const e=g('ovTime');if(e)e.textContent=now();},1000);
 
 // ── Keep-alive ──
@@ -1401,6 +1461,46 @@ function updLabel(s){
   }
 }
 
+// ── Period time window ──
+function getPeriodElapsed(s){
+  const tf=gv(s==='u'?'tfU':'tfD')||'15m';
+  const sec={'5m':300,'15m':900,'1h':3600,'4h':14400,'1d':86400}[tf]||900;
+  return Math.floor(Date.now()/1000)%sec;
+}
+function isPeriodTimeOK(s){
+  const SU=s.toUpperCase();
+  const elapsed=getPeriodElapsed(s);
+  const startMin=parseInt(gv('ptMin'+SU))||0;
+  const startSec=parseInt(gv('ptSec'+SU))||0;
+  const endMin=parseInt(gv('ptMinEnd'+SU))||0;
+  const endSec=parseInt(gv('ptSecEnd'+SU))||0;
+  const startTotal=startMin*60+startSec;
+  const endTotal=endMin*60+endSec;
+  // If both are 0, no restriction
+  if(startTotal===0&&endTotal===0)return true;
+  // If end <= start, treat as no restriction
+  if(endTotal>0&&endTotal<=startTotal)return true;
+  const ok=elapsed>=startTotal&&(endTotal===0||elapsed<=endTotal);
+  return ok;
+}
+function updatePeriodStatus(){
+  ['u','d'].forEach(s=>{
+    const SU=s.toUpperCase();
+    const el=g('ptSt'+SU);if(!el)return;
+    const tf=gv(s==='u'?'tfU':'tfD')||'15m';
+    const sec={'5m':300,'15m':900,'1h':3600,'4h':14400,'1d':86400}[tf]||900;
+    const elapsed=getPeriodElapsed(s);
+    const remaining=sec-elapsed;
+    const mm=String(Math.floor(elapsed/60)).padStart(2,'0');
+    const ss=String(elapsed%60).padStart(2,'0');
+    const rm=String(Math.floor(remaining/60)).padStart(2,'0');
+    const rs=String(remaining%60).padStart(2,'0');
+    const ok=isPeriodTimeOK(s);
+    el.innerHTML=`<span style="color:${ok?'var(--up)':'var(--txt3)'}">${ok?'✓ JANELA ABERTA':'✗ fora da janela'}</span> · ${mm}:${ss} elapsed · ${rm}:${rs} restantes`;
+  });
+}
+setInterval(updatePeriodStatus,1000);
+
 // ── TRADE ENGINE ──
 function executeTrade(B){
   const s=B.dir;
@@ -1408,6 +1508,7 @@ function executeTrade(B){
   const dl=Math.max(5,gi(s==='u'?'dlU':'dlD')||5)*1000;
   if(B._last&&Date.now()-B._last<dl)return;
   if(!inTimeWindow(s))return;
+  if(!isPeriodTimeOK(s))return;
   if(!checkTrigger(s))return;
 
   const mn=gf(s==='u'?'tminU':'tminD');
@@ -1650,7 +1751,8 @@ function toggleTP(s){const el=g('tpFld'+s.toUpperCase());if(el)el.style.display=
 const CFG_IDS=['tfU','tfD','modeU','modeD','tminU','tminD','tmaxU','tmaxD','slipU','slipD',
   'tpvU','tpvD','tpwU','tpwD','tavU','tavD','szU','szD','rnU','rnD','dlU','dlD',
   'slNU','slND','stU','stD','tpEnU','tpEnD','tpU','tpD','mlU','mlD','twU','twD',
-  'twsU','tweU','twsD','tweD','upThresh','dnThresh','momWin'];
+  'twsU','tweU','twsD','tweD','upThresh','dnThresh','momWin',
+  'ptMinU','ptSecU','ptMinEndU','ptSecEndU','ptMinD','ptSecD','ptMinEndD','ptSecEndD'];
 function setupAutoSave(){
   CFG_IDS.forEach(id=>{const el=g(id);if(el){el.addEventListener('change',saveConfig);el.addEventListener('input',saveConfig);}});
 }
