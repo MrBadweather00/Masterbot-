@@ -1327,23 +1327,26 @@ function trade(B){
   // 12. Resolve resultado após duração do timeframe
   // Guarda preço de entrada para comparar com preço de fechamento
   const priceAtEntry=E.price;
+  // CAPTURA ref do período AGORA antes do setTimeout
+  // B.periodOpen pode mudar durante o setTimeout — capturar agora garante a ref correta
+  const periodRefAtEntry=B.periodOpen||E.price;
+  log(`${tag} ${actualDir} ref do período: $${periodRefAtEntry.toFixed(2)}`,'i');
   setTimeout(()=>{
     if(!B.running)return;
     const shares=sz/polyP;
     const profit=parseFloat((shares-sz).toFixed(2));
     // Simulação honesta — mesma lógica da Polymarket:
     // "Resolve UP se preço FINAL >= preço INICIAL do período"
-    // O "preço inicial" é B.periodOpen (ref fixada no início do período)
-    // Independente de quando o bot entrou dentro do período
-    let win;
-    const periodRef=B.periodOpen||priceAtEntry;
+    // periodRefAtEntry foi capturado no momento da entrada — não muda
     const finalPrice=E.price||priceAtEntry;
-    const finalDiff=finalPrice-periodRef; // positivo = BTC subiu vs início do período
+    const finalDiff=finalPrice-periodRefAtEntry;
+    let win;
     if(effectiveDir==='up'){
-      win=finalDiff>=0; // UP ganha se fechou >= ref inicial
+      win=finalDiff>=0; // UP ganha se BTC fechou >= ref do período
     } else {
-      win=finalDiff<0;  // DOWN ganha se fechou < ref inicial
+      win=finalDiff<0;  // DOWN ganha se BTC fechou < ref do período
     }
+    log(`${tag} ${actualDir} resolução: ref=$${periodRefAtEntry.toFixed(2)} final=$${finalPrice.toFixed(2)} diff=${finalDiff>=0?'+':''}$${finalDiff.toFixed(2)} → ${win?'WIN':'LOSS'}`,'i');
     const pd=win?profit:-sz;
     B.pnl=parseFloat((B.pnl+pd).toFixed(2));
     B.pnlHist.push(B.pnl);
