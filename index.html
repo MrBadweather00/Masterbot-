@@ -8,13 +8,13 @@
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=JetBrains+Mono:wght@400;600;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
 :root{
-  --bg0:#181c20;--bg1:#1e2329;--bg2:#242a30;--bg3:#2a3038;--bg4:#303840;--bg5:#384048;
-  --b1:#2a3038;--b2:#354048;--b3:#404c58;
+  --bg0:#2c3035;--bg1:#343a40;--bg2:#3c4248;--bg3:#444c54;--bg4:#4c555e;--bg5:#556068;
+  --b1:#4a5260;--b2:#586070;--b3:#667080;
   --up:#00e5a0;--up2:#00b87a;--up3:rgba(0,229,160,.12);
   --dn:#ff3b5c;--dn2:#cc1a3a;--dn3:rgba(255,59,92,.12);
   --gold:#f0b429;--gold2:#c8891a;--gold3:rgba(240,180,41,.12);
   --blue:#3b9eff;--blue2:#1a7fd4;--blue3:rgba(59,158,255,.12);
-  --txt:#8ab0cc;--txt2:#5a7a99;--txt3:#3a5570;--white:#d8eeff;
+  --txt:#c8d8e8;--txt2:#90a8bc;--txt3:#6a8098;--white:#eef6ff;
 }
 *{box-sizing:border-box;margin:0;padding:0;}
 html,body{height:100%;overflow:hidden;}
@@ -23,9 +23,10 @@ body::after{content:'';position:fixed;inset:0;pointer-events:none;z-index:9998;b
 
 /* ─── LOGIN ─────────────────────────────────── */
 #loginScreen{
-position:fixed;inset:0;z-index:10000;
-background:#111518; /* sólido — jamais translúcido */
+position:fixed;inset:0;z-index:99999;
+background:#1a1e22 !important;
 display:flex;align-items:center;justify-content:center;
+isolation:isolate;
 }
 .login-box{
 width:320px;
@@ -492,6 +493,8 @@ box-shadow:0 8px 32px rgba(0,0,0,.6);
 transition:transform .3s ease;z-index:1000;white-space:nowrap;
 }
 .toast.show{transform:translateX(-50%) translateY(0);}
+#appContent{visibility:hidden;}
+#appContent.unlocked{visibility:visible;}
 </style>
 
 </head>
@@ -516,8 +519,8 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
   </div>
 </div>
 
+<div id="appContent">
 <!-- ═══ TOPBAR ═══ -->
-
 <div class="topbar">
   <div class="brand">MASTER<em>BOT</em><sup>v4</sup></div>
   <div class="chips" id="chips">
@@ -783,9 +786,10 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
         <div style="margin-top:6px;padding:5px 7px;background:var(--bg3);border-radius:5px;font-family:'JetBrains Mono',monospace;font-size:7px;" id="tsU"><span style="color:var(--txt3)">Aguardando dados...</span></div>
         <!-- Period time window -->
         <div style="margin-top:8px;padding:8px;background:var(--bg3);border-radius:7px;border:1px solid var(--b1);">
-          <div style="font-family:'JetBrains Mono',monospace;font-size:7px;color:var(--txt3);letter-spacing:1px;margin-bottom:6px;">⏱ JANELA DENTRO DO PERÍODO</div>
+          <div style="font-family:'JetBrains Mono',monospace;font-size:7px;color:var(--txt3);letter-spacing:1px;margin-bottom:6px;">⏱ GATILHO DE TEMPO (dentro do período)</div>
+          <div class="fld-hint" style="margin-bottom:6px;font-size:7px;color:var(--txt2)">Para 5min: 0:10 a 4:00 · Para 15min: 0:30 a 14:00</div>
           <div class="g2">
-            <div class="fld"><label>Entrar após (mm:ss)</label>
+            <div class="fld"><label>Início (min:seg após abertura)</label>
               <div class="fld-row">
                 <input type="number" id="ptMinU" value="0" min="0" max="59" style="width:44px">
                 <span class="fld-unit">:</span>
@@ -820,18 +824,17 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
       <div class="sec">⏰ Janela de Horário</div>
       <div class="card">
         <div class="tog-row">
-          <div><div class="tog-l">Ativar janela</div><div class="tog-s">Opera só no intervalo</div></div>
+          <div><div class="tog-l">Ativar janela de horário</div><div class="tog-s">Opera apenas no intervalo definido</div></div>
           <label class="tog"><input type="checkbox" id="twU" onchange="toggleTW('u')"><div class="togt"></div></label>
         </div>
-        <div id="twFU" style="display:none;margin-top:7px">
-          <div style="display:flex;align-items:center;gap:6px;margin-bottom:5px">
-            <div class="fld" style="flex:1;margin:0"><label>Início</label><input type="time" id="twsU" value="00:00"></div>
-            <span style="color:var(--txt3);font-size:10px;margin-top:10px">→</span>
-            <div class="fld" style="flex:1;margin:0"><label>Fim</label><input type="time" id="tweU" value="22:00"></div>
+        <div id="twFU" style="display:none;margin-top:10px">
+          <div class="g2" style="margin-bottom:6px">
+            <div class="fld"><label>Horário início</label><input type="time" id="twsU" value="00:00"></div>
+            <div class="fld"><label>Horário fim</label><input type="time" id="tweU" value="22:00"></div>
           </div>
-          <div style="font-family:'JetBrains Mono',monospace;font-size:7px;color:var(--txt3)" id="twStU">—</div>
-          <div class="fld" style="margin-top:6px"><label>Dias ativos</label>
-            <div style="display:flex;gap:3px;flex-wrap:wrap;margin-top:3px" id="dpU">
+          <div style="padding:5px 7px;background:var(--bg3);border-radius:5px;font-family:'JetBrains Mono',monospace;font-size:7px;margin-bottom:7px" id="twStU">—</div>
+          <div class="fld"><label>Dias da semana ativos</label>
+            <div style="display:flex;gap:3px;flex-wrap:wrap;margin-top:4px" id="dpU">
               <button class="day-btn active" data-day="0">DOM</button>
               <button class="day-btn active" data-day="1">SEG</button>
               <button class="day-btn active" data-day="2">TER</button>
@@ -1000,9 +1003,10 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
         <div style="margin-top:6px;padding:5px 7px;background:var(--bg3);border-radius:5px;font-family:'JetBrains Mono',monospace;font-size:7px;" id="tsD"><span style="color:var(--txt3)">Aguardando dados...</span></div>
         <!-- Period time window -->
         <div style="margin-top:8px;padding:8px;background:var(--bg3);border-radius:7px;border:1px solid var(--b1);">
-          <div style="font-family:'JetBrains Mono',monospace;font-size:7px;color:var(--txt3);letter-spacing:1px;margin-bottom:6px;">⏱ JANELA DENTRO DO PERÍODO</div>
+          <div style="font-family:'JetBrains Mono',monospace;font-size:7px;color:var(--txt3);letter-spacing:1px;margin-bottom:6px;">⏱ GATILHO DE TEMPO (dentro do período)</div>
+          <div class="fld-hint" style="margin-bottom:6px;font-size:7px;color:var(--txt2)">Para 5min: 0:10 a 4:00 · Para 15min: 0:30 a 14:00</div>
           <div class="g2">
-            <div class="fld"><label>Entrar após (mm:ss)</label>
+            <div class="fld"><label>Início (min:seg após abertura)</label>
               <div class="fld-row">
                 <input type="number" id="ptMinD" value="0" min="0" max="59" style="width:44px">
                 <span class="fld-unit">:</span>
@@ -1035,18 +1039,17 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
       <div class="sec">⏰ Janela de Horário</div>
       <div class="card">
         <div class="tog-row">
-          <div><div class="tog-l">Ativar janela</div><div class="tog-s">Opera só no intervalo</div></div>
+          <div><div class="tog-l">Ativar janela de horário</div><div class="tog-s">Opera apenas no intervalo definido</div></div>
           <label class="tog"><input type="checkbox" id="twD" onchange="toggleTW('d')"><div class="togt"></div></label>
         </div>
-        <div id="twFD" style="display:none;margin-top:7px">
-          <div style="display:flex;align-items:center;gap:6px;margin-bottom:5px">
-            <div class="fld" style="flex:1;margin:0"><label>Início</label><input type="time" id="twsD" value="00:00"></div>
-            <span style="color:var(--txt3);font-size:10px;margin-top:10px">→</span>
-            <div class="fld" style="flex:1;margin:0"><label>Fim</label><input type="time" id="tweD" value="22:00"></div>
+        <div id="twFD" style="display:none;margin-top:10px">
+          <div class="g2" style="margin-bottom:6px">
+            <div class="fld"><label>Horário início</label><input type="time" id="twsD" value="00:00"></div>
+            <div class="fld"><label>Horário fim</label><input type="time" id="tweD" value="22:00"></div>
           </div>
-          <div style="font-family:'JetBrains Mono',monospace;font-size:7px;color:var(--txt3)" id="twStD">—</div>
-          <div class="fld" style="margin-top:6px"><label>Dias ativos</label>
-            <div style="display:flex;gap:3px;flex-wrap:wrap;margin-top:3px" id="dpD">
+          <div style="padding:5px 7px;background:var(--bg3);border-radius:5px;font-family:'JetBrains Mono',monospace;font-size:7px;margin-bottom:7px" id="twStD">—</div>
+          <div class="fld"><label>Dias da semana ativos</label>
+            <div style="display:flex;gap:3px;flex-wrap:wrap;margin-top:4px" id="dpD">
               <button class="day-btn active" data-day="0">DOM</button>
               <button class="day-btn active" data-day="1">SEG</button>
               <button class="day-btn active" data-day="2">TER</button>
@@ -1120,6 +1123,7 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
 </div>
 
 <div class="toast" id="toast"></div>
+</div><!-- end appContent -->
 
 <script>
 // ════════════════════════════════════════════════════════
@@ -1867,6 +1871,7 @@ function doLogin(){
     g('loginScreen').style.display='none';
     showUserChip(u);
     sessionStorage.setItem('_mbv4',u);
+    g('appContent').classList.add('unlocked');
     log(`Bem-vindo, ${NAMES[u]}!`,'s');
     // Start bot systems after login
     connectWS();
@@ -1880,6 +1885,7 @@ function doLogin(){
 function doLogout(){
   sessionStorage.removeItem('_mbv4');
   g('loginScreen').style.display='flex';
+  g('appContent').classList.remove('unlocked');
   g('userChip').style.display='none';
   g('loginUser').value='';g('loginPass').value='';g('loginErr').textContent='';
   // Stop bots
@@ -1898,6 +1904,7 @@ function showUserChip(u){
   const u=sessionStorage.getItem('_mbv4');
   if(u&&USERS[u]){
     g('loginScreen').style.display='none';
+    g('appContent').classList.add('unlocked');
     showUserChip(u);
     connectWS();
     setTimeout(()=>{loadConfig();loadHistory();setupAutoSave();drawPnlChart('u');drawPnlChart('d');},300);
