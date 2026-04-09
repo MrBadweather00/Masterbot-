@@ -1325,11 +1325,25 @@ function trade(B){
   updLbl(s);updBridges();updTS(s);
 
   // 12. Resolve resultado após duração do timeframe
+  // Guarda preço de entrada para comparar com preço de fechamento
+  const priceAtEntry=E.price;
   setTimeout(()=>{
     if(!B.running)return;
     const shares=sz/polyP;
     const profit=parseFloat((shares-sz).toFixed(2));
-    const win=Math.random()<wp;
+    // Simulação honesta — mesma lógica da Polymarket:
+    // "Resolve UP se preço FINAL >= preço INICIAL do período"
+    // O "preço inicial" é B.periodOpen (ref fixada no início do período)
+    // Independente de quando o bot entrou dentro do período
+    let win;
+    const periodRef=B.periodOpen||priceAtEntry;
+    const finalPrice=E.price||priceAtEntry;
+    const finalDiff=finalPrice-periodRef; // positivo = BTC subiu vs início do período
+    if(effectiveDir==='up'){
+      win=finalDiff>=0; // UP ganha se fechou >= ref inicial
+    } else {
+      win=finalDiff<0;  // DOWN ganha se fechou < ref inicial
+    }
     const pd=win?profit:-sz;
     B.pnl=parseFloat((B.pnl+pd).toFixed(2));
     B.pnlHist.push(B.pnl);
