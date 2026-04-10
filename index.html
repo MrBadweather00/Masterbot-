@@ -1266,6 +1266,31 @@ setInterval(()=>{
   }
 },10000);
 
+
+// ── Kline Open (referência do período) ──
+async function fetchKlineOpen(sym,tf,pStartMs){
+  // Mapear tf para intervalo Binance
+  const interval={'5m':'5m','15m':'15m','1h':'1h','4h':'4h','1d':'1d'}[tf]||'15m';
+  try{
+    const url=`https://api.binance.com/api/v3/klines?symbol=${sym}&interval=${interval}&startTime=${pStartMs}&limit=1`;
+    const res=await fetch(url);
+    if(!res.ok)return;
+    const data=await res.json();
+    if(data&&data[0]){
+      const openPrice=parseFloat(data[0][1]); // índice 1 = open price
+      const klineStart=data[0][0]; // índice 0 = open time ms
+      // Só atualizar se ainda estiver no mesmo período
+      if(E.periodRefStart===pStartMs&&openPrice>0){
+        E.periodRef=openPrice;
+        log(`📍 Ref período atualizada: $${openPrice.toFixed(2)} (kline open)`,'i');
+        updDelta(); // atualizar delta imediatamente
+      }
+    }
+  }catch(e){
+    // Silencioso — continua usando o fallback do primeiro tick
+  }
+}
+
 // ── WebSocket ──
 function connectWS(){
   setWS('wait','CONECTANDO');
@@ -1290,14 +1315,17 @@ function onTick(price,ts){
   E.hist.push({t,p:price});
   E.hist=E.hist.filter(x=>x.t>Date.now()-600000);
 
-  // Atualizar E.periodRef — referência global do período (independente dos bots)
-  // Usa o timeframe do bot UP como referência principal
+  // Atualizar E.periodRef via kline open da Binance (mais próximo do Chainlink)
   {
     const tf=gv('tfU')||gv('tfD')||'15m';
     const sec={'5m':300,'15m':900,'1h':3600,'4h':14400,'1d':86400}[tf]||900;
     const pStart=Math.floor(Date.now()/1000/sec)*sec*1000;
     if(!E.periodRefStart||E.periodRefStart<pStart){
-      E.periodRef=price;E.periodRefStart=pStart;
+      // Novo período detectado
+      E.periodRefStart=pStart;
+      E.periodRef=price; // fallback imediato com primeiro tick
+      // Buscar open price do kline via REST (mais preciso)
+      fetchKlineOpen(E.sym,tf,pStart);
     }
   }
 
@@ -1537,6 +1565,8 @@ function startBot(s){
   const _sec={'5m':300,'15m':900,'1h':3600,'4h':14400,'1d':86400}[_tf]||900;
   B.periodStart=Math.floor(Date.now()/1000/_sec)*_sec*1000;
   B.periodOpen=E.price;
+  // Buscar kline open para alinhar ref com Polymarket
+  if(!E.periodRef||E.periodRefStart<B.periodStart){E.periodRef=E.price;E.periodRefStart=B.periodStart;fetchKlineOpen(E.sym,_tf,B.periodStart);}
   g('bs'+s.toUpperCase()).style.display='none';
   g('bx'+s.toUpperCase()).style.display='';
   log(`DRBot ${s==='u'?'UP ↑':'DOWN ↓'} iniciado · ref: $${E.price.toFixed(2)} · trigger: ${m}`,'i');
