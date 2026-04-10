@@ -839,11 +839,15 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
             </select>
           </div>
         </div>
-        <div id="taFU">
-          <div class="fld"><label>Variação acima de ($)</label>
-            <div class="fld-row"><input type="number" id="tavU" value="10" min="1" step="5"><span class="fld-unit">$</span></div>
-            <div class="fld-hint">Ex: $10 = entra se BTC subiu ≥ $10 desde abertura do período</div>
+        <div id="taFU" style="display:none"></div>
+        <!-- Delta absoluto — sempre visível -->
+        <div class="fld" style="margin-top:6px;background:var(--bg3);border-radius:7px;padding:8px;border:1px solid var(--b1);">
+          <label style="color:var(--gold)">⚡ Delta mínimo ($) — gatilho de entrada</label>
+          <div class="fld-row" style="margin-top:4px">
+            <input type="number" id="tavU" value="10" min="1" step="5" style="font-size:15px;font-weight:700;color:var(--white)">
+            <span class="fld-unit" style="font-size:12px;color:var(--gold)">$</span>
           </div>
+          <div class="fld-hint">UP: entra se preço atual ≥ ref + $<span id="tavULbl">10</span> · BTC precisa subir este valor desde abertura</div>
         </div>
         <!-- Trig status display -->
         <div style="margin-top:6px;padding:5px 7px;background:var(--bg3);border-radius:5px;font-family:'JetBrains Mono',monospace;font-size:7px;" id="tsU"><span style="color:var(--txt3)">Aguardando dados...</span></div>
@@ -1059,11 +1063,15 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
             </select>
           </div>
         </div>
-        <div id="taFD">
-          <div class="fld"><label>Variação abaixo de ($)</label>
-            <div class="fld-row"><input type="number" id="tavD" value="10" min="1" step="5"><span class="fld-unit">$</span></div>
-            <div class="fld-hint">Ex: $10 = entra se BTC caiu ≥ $10 desde abertura do período</div>
+        <div id="taFD" style="display:none"></div>
+        <!-- Delta absoluto — sempre visível -->
+        <div class="fld" style="margin-top:6px;background:var(--bg3);border-radius:7px;padding:8px;border:1px solid var(--b1);">
+          <label style="color:var(--dn)">⚡ Delta mínimo ($) — gatilho de entrada</label>
+          <div class="fld-row" style="margin-top:4px">
+            <input type="number" id="tavD" value="10" min="1" step="5" style="font-size:15px;font-weight:700;color:var(--white)">
+            <span class="fld-unit" style="font-size:12px;color:var(--dn)">$</span>
           </div>
+          <div class="fld-hint">DOWN: entra se preço atual ≤ ref − $<span id="tavDLbl">10</span> · BTC precisa cair este valor desde abertura</div>
         </div>
         <div style="margin-top:6px;padding:5px 7px;background:var(--bg3);border-radius:5px;font-family:'JetBrains Mono',monospace;font-size:7px;" id="tsD"><span style="color:var(--txt3)">Aguardando dados...</span></div>
         <!-- Period time window -->
@@ -1956,6 +1964,15 @@ g('chips').addEventListener('click',ev=>{
   const dp=g('dp'+su);if(dp)dp.addEventListener('click',ev=>{const b=ev.target.closest('.day-btn');if(b){b.classList.toggle('active');saveConfig();}});
 });
 const mw=g('momWin');if(mw)mw.addEventListener('input',function(){const v=g('momWinVal');if(v)v.textContent=this.value;saveConfig();});
+// Delta label live update
+['u','d'].forEach(s=>{
+  const el=g('tav'+s.toUpperCase());
+  if(el)el.addEventListener('input',function(){
+    const lbl=g('tav'+s.toUpperCase()+'Lbl');
+    if(lbl)lbl.textContent=this.value;
+    saveConfig();
+  });
+});
 function toggleTW(s){const el=g('twF'+s.toUpperCase());if(el)el.style.display=gc('tw'+s.toUpperCase())?'block':'none';saveConfig();}
 function toggleTP(s){const el=g('tpFld'+s.toUpperCase());if(el)el.style.display=gc('tpEn'+s.toUpperCase())?'block':'none';saveConfig();}
 
