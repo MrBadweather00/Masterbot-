@@ -608,9 +608,11 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
           <div class="chart-hdr">
             <div class="chart-lbl">PREÇO LIVE · BINANCE</div>
             <div class="rbtns">
+              <button class="rbtn" onclick="setRange(10)" id="rb10">10s</button>
               <button class="rbtn active" onclick="setRange(30)" id="rb30">30s</button>
               <button class="rbtn" onclick="setRange(60)" id="rb60">1m</button>
               <button class="rbtn" onclick="setRange(300)" id="rb300">5m</button>
+              <button class="rbtn" onclick="setRange(3600)" id="rb3600">1h</button>
             </div>
           </div>
           <canvas id="echart"></canvas>
@@ -1196,7 +1198,7 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
 // ════════════════════════════════════════════════════════
 
 // ── State ──
-const E={sym:'BTCUSDT',lbl:'BTC',price:null,prev:null,open:null,high:null,low:null,ticks:0,hist:[],ws:null,range:30,signal:'neutral',momentum:0};
+const E={sym:'BTCUSDT',lbl:'BTC',price:null,prev:null,open:null,high:null,low:null,ticks:0,hist:[],ws:null,range:30,signal:'neutral',momentum:0,periodRef:null,periodRefStart:null};
 const BU={dir:'u',running:false,rounds:0,wins:0,losses:0,pnl:0,consec:0,_last:null,pnlHist:[0],inTrade:false,periodOpen:null,periodStart:null};
 const BD={dir:'d',running:false,rounds:0,wins:0,losses:0,pnl:0,consec:0,_last:null,pnlHist:[0],inTrade:false,periodOpen:null,periodStart:null};
 const TM={u:'abs',d:'abs'}; // default: Valor Absoluto
@@ -1287,6 +1289,17 @@ function onTick(price,ts){
   const t=Date.now(); // usa tempo local sempre para consistência
   E.hist.push({t,p:price});
   E.hist=E.hist.filter(x=>x.t>Date.now()-600000);
+
+  // Atualizar E.periodRef — referência global do período (independente dos bots)
+  // Usa o timeframe do bot UP como referência principal
+  {
+    const tf=gv('tfU')||gv('tfD')||'15m';
+    const sec={'5m':300,'15m':900,'1h':3600,'4h':14400,'1d':86400}[tf]||900;
+    const pStart=Math.floor(Date.now()/1000/sec)*sec*1000;
+    if(!E.periodRefStart||E.periodRefStart<pStart){
+      E.periodRef=price;E.periodRefStart=pStart;
+    }
+  }
 
   // Reset periodOpen each new clock period — only when NOT in trade
   ['u','d'].forEach(s=>{
@@ -1793,15 +1806,15 @@ function updateClocks(){
   // Delta: preço atual vs periodOpen de cada bot
   const deltaEl=g('clockDelta');
   if(deltaEl&&E.price){
-    // Delta simples: verde se positivo, vermelho se negativo
-    const ref=BU.periodOpen||BD.periodOpen;
+    // Delta usando E.periodRef — primeiro preço do período (alinhado com Polymarket/Chainlink)
+    const ref=E.periodRef;
     if(ref){
       const d=E.price-ref;
       const col=d>=0?'var(--up)':'var(--dn)';
       const arrow=d>=0?'▲':'▼';
-      deltaEl.innerHTML=`<span style="color:var(--txt3)">Δ ref $${ref.toFixed(0)}: </span><span style="color:${col};font-weight:700;font-size:10px">${arrow} ${d>=0?'+':''}$${d.toFixed(0)}</span>`;
+      deltaEl.innerHTML=`<span style="color:var(--txt3)">Δ período: </span><span style="color:${col};font-weight:700;font-size:11px">${arrow} ${d>=0?'+':''}$${d.toFixed(2)}</span><span style="color:var(--txt3);font-size:7px"> (ref $${ref.toFixed(2)})</span>`;
     } else {
-      deltaEl.innerHTML='<span style="color:var(--txt3)">Aguardando ref...</span>';
+      deltaEl.innerHTML='<span style="color:var(--txt3)">Aguardando primeiro tick do período...</span>';
     }
   }
 
@@ -1824,7 +1837,7 @@ function updateClocks(){
 setInterval(updateClocks,1000);
 
 // ── Charts ──
-function setRange(s){E.range=s;['30','60','300'].forEach(r=>{const el=g('rb'+r);if(el)el.className='rbtn'+(r==s?' active':'');});drawEChart();}
+function setRange(s){E.range=s;['10','30','60','300','3600'].forEach(r=>{const el=g('rb'+r);if(el)el.className='rbtn'+(r==s?' active':'');});drawEChart();}
 function drawEChart(){
   const c=g('echart');if(!c||!c.offsetWidth)return;
   const dpr=window.devicePixelRatio||1,W=c.offsetWidth,H=88;
@@ -1895,7 +1908,7 @@ g('chips').addEventListener('click',ev=>{
   const c=ev.target.closest('.chip');if(!c)return;
   document.querySelectorAll('.chip').forEach(x=>x.classList.remove('active'));c.classList.add('active');
   E.sym=c.dataset.sym;E.lbl=c.dataset.lbl;
-  E.price=null;E.prev=null;E.open=null;E.high=null;E.low=null;E.ticks=0;E.hist=[];E.signal='neutral';E.momentum=0;
+  E.price=null;E.prev=null;E.open=null;E.high=null;E.low=null;E.ticks=0;E.hist=[];E.signal='neutral';E.momentum=0;E.periodRef=null;E.periodRefStart=null;
   g('heroAsset').textContent=E.lbl+' / USDT';
   g('heroPrice').textContent='—';
   if(E.ws){E.ws._kill=true;try{E.ws.close();}catch(e){}}
