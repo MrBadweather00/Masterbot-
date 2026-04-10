@@ -841,8 +841,8 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
         </div>
         <div id="taFU">
           <div class="fld"><label>Variação acima de ($)</label>
-            <div class="fld-row"><input type="number" id="tavU" value="50" min="1" step="10"><span class="fld-unit">$</span></div>
-            <div class="fld-hint">UP entra se atual ≥ ref + $X desde início do período</div>
+            <div class="fld-row"><input type="number" id="tavU" value="10" min="1" step="5"><span class="fld-unit">$</span></div>
+            <div class="fld-hint">Ex: $10 = entra se BTC subiu ≥ $10 desde abertura do período</div>
           </div>
         </div>
         <!-- Trig status display -->
@@ -862,7 +862,7 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
             </div>
             <div class="fld"><label>Parar de entrar (mm:ss)</label>
               <div class="fld-row">
-                <input type="number" id="ptMinEndU" value="4" min="0" max="59" style="width:44px">
+                <input type="number" id="ptMinEndU" value="0" min="0" max="59" style="width:44px">
                 <span class="fld-unit">:</span>
                 <input type="number" id="ptSecEndU" value="0" min="0" max="59" style="width:44px">
               </div>
@@ -1061,8 +1061,8 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
         </div>
         <div id="taFD">
           <div class="fld"><label>Variação abaixo de ($)</label>
-            <div class="fld-row"><input type="number" id="tavD" value="50" min="1" step="10"><span class="fld-unit">$</span></div>
-            <div class="fld-hint">DOWN entra se atual ≤ ref − $X desde início do período</div>
+            <div class="fld-row"><input type="number" id="tavD" value="10" min="1" step="5"><span class="fld-unit">$</span></div>
+            <div class="fld-hint">Ex: $10 = entra se BTC caiu ≥ $10 desde abertura do período</div>
           </div>
         </div>
         <div style="margin-top:6px;padding:5px 7px;background:var(--bg3);border-radius:5px;font-family:'JetBrains Mono',monospace;font-size:7px;" id="tsD"><span style="color:var(--txt3)">Aguardando dados...</span></div>
@@ -1080,7 +1080,7 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
             </div>
             <div class="fld"><label>Parar de entrar (mm:ss)</label>
               <div class="fld-row">
-                <input type="number" id="ptMinEndD" value="4" min="0" max="59" style="width:44px">
+                <input type="number" id="ptMinEndD" value="0" min="0" max="59" style="width:44px">
                 <span class="fld-unit">:</span>
                 <input type="number" id="ptSecEndD" value="0" min="0" max="59" style="width:44px">
               </div>
@@ -1623,7 +1623,8 @@ function isPeriodTimeOK(s){
   if(startTotal===0&&endTotal===0)return true;
   // end deve ser maior que start para ser válido
   if(endTotal>0&&endTotal<=startTotal)return false;
-  const ok=elapsed>=startTotal&&(endTotal===0||elapsed<=endTotal);
+  // endTotal=0 significa sem limite de fim
+  const ok=elapsed>=startTotal&&(endTotal===0||elapsed<endTotal);
   return ok;
 }
 function updatePeriodStatus(){
@@ -1699,7 +1700,7 @@ function executeTrade(B){
   const nowSec=Math.floor(Date.now()/1000);
   const periodEnd=(Math.floor(nowSec/periodSec)*periodSec+periodSec)*1000;
   const dur=Math.max(1000,periodEnd-Date.now());
-  if(dur<10000)log(`⚠ ${actualDir} entrada perto do fechamento (${Math.round(dur/1000)}s restantes)`,'w');
+  // log de aviso movido para depois da declaração de actualDir
 
   // Win probability based on edge + direction alignment
   let wp=0.52;
@@ -1714,6 +1715,7 @@ function executeTrade(B){
   const _seed=((B.rounds*7919)+(Date.now()%10000))%1000;
   const polyP=parseFloat((mn+(_seed/1000)*(mx-mn)).toFixed(2));
   const actualDir=effectiveDir==='up'?'UP':'DOWN';
+  if(dur<10000)log(`⚠ ${actualDir} entrada perto do fechamento (${Math.round(dur/1000)}s restantes)`,'w');
   const et=strong?(effectiveDir==='up'?'⚡↑':'⚡↓'):'';
   const tag=apiConfigured()?'[REAL]':'[SIM]';
   const entryTime=now();
