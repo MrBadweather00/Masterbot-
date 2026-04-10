@@ -1315,7 +1315,7 @@ function onTick(price,ts){
     }
   });
 
-  renderPrice();renderMkt();renderEdge();drawEChart();updSrcLabel();
+  renderPrice();renderMkt();renderEdge();drawEChart();updSrcLabel();updDelta();
   updTrigStatus('u');updTrigStatus('d');
   if(BU.running&&!BU.inTrade&&!_gLock)executeTrade(BU);
   if(BD.running&&!BD.inTrade&&!_gLock)executeTrade(BD);
@@ -1329,6 +1329,19 @@ function updSrcLabel(){
   if(lbl)lbl.textContent=usesChainlink?'BINANCE STREAM + CHAINLINK REF':'BINANCE STREAM';
   if(dot)dot.style.background=usesChainlink?'#375bd2':'#f0b90b';
 }
+// ── Delta do período (atualiza a cada tick) ──
+function updDelta(){
+  const deltaEl=g('clockDelta');
+  if(!deltaEl)return;
+  const ref=E.periodRef;
+  if(!ref||!E.price){deltaEl.innerHTML='<span style="color:var(--txt3)">Aguardando ref...</span>';return;}
+  const d=E.price-ref;
+  const col=d>=0?'var(--up)':'var(--dn)';
+  const arrow=d>=0?'▲':'▼';
+  const sign=d>=0?'+':'';
+  deltaEl.innerHTML=`<span style="color:var(--txt3);font-size:7px">Δ período (ref $${ref.toFixed(2)}): </span><span style="color:${col};font-weight:700;font-size:12px">${arrow} ${sign}$${d.toFixed(2)}</span>`;
+}
+
 // ── Render ──
 function renderPrice(){
   const el=g('heroPrice'),dir=E.prev?(E.price>E.prev?'up':'dn'):'';
@@ -1804,19 +1817,7 @@ function updateClocks(){
   if(tfLbl)tfLbl.textContent='Timeframe: '+tf+(remaining<=30?' · ⚠ FECHANDO!':remaining<=60?' · fechando em breve':'');
 
   // Delta: preço atual vs periodOpen de cada bot
-  const deltaEl=g('clockDelta');
-  if(deltaEl&&E.price){
-    // Delta usando E.periodRef — primeiro preço do período (alinhado com Polymarket/Chainlink)
-    const ref=E.periodRef;
-    if(ref){
-      const d=E.price-ref;
-      const col=d>=0?'var(--up)':'var(--dn)';
-      const arrow=d>=0?'▲':'▼';
-      deltaEl.innerHTML=`<span style="color:var(--txt3)">Δ período: </span><span style="color:${col};font-weight:700;font-size:11px">${arrow} ${d>=0?'+':''}$${d.toFixed(2)}</span><span style="color:var(--txt3);font-size:7px"> (ref $${ref.toFixed(2)})</span>`;
-    } else {
-      deltaEl.innerHTML='<span style="color:var(--txt3)">Aguardando primeiro tick do período...</span>';
-    }
-  }
+  // delta atualizado por updDelta() a cada tick
 
   // UP status badge
   const stU=g('clockStU');
