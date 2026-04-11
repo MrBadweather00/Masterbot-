@@ -1554,7 +1554,8 @@ function checkTrigger(s){
   if(!ref)return false;
   const diff=E.price-ref;
   const diffPct=ref>0?(diff/ref*100):0;
-  let pOk=true,aOk=true;
+  // Iniciar como false — só ficam true se explicitamente verificados
+  let pOk=false,aOk=false;
   if(m==='pct'||m==='both'){
     const th=gf(s==='u'?'tpvU':'tpvD');
     if(isNaN(th)||th<=0)return false;
@@ -1708,21 +1709,38 @@ function executeTrade(B){
   if(!E.price||B.inTrade||_gLock)return;
   const dl=Math.max(5,gi(s==='u'?'dlU':'dlD')||5)*1000;
   if(B._last&&Date.now()-B._last<dl)return;
-  if(!inTimeWindow(s))return;
-  if(!isPeriodTimeOK(s))return;
-  if(!checkTrigger(s))return;
+  if(!inTimeWindow(s)){
+    const d=g('diag'+s.toUpperCase());
+    if(d&&B.running)d.innerHTML='<span style="color:var(--txt3)">⏸ Fora da janela de horário</span>';
+    return;
+  }
+  if(!isPeriodTimeOK(s)){
+    const d=g('diag'+s.toUpperCase());
+    if(d&&B.running)d.innerHTML='<span style="color:var(--txt3)">⏱ Aguardando janela do período</span>';
+    return;
+  }
+  if(!checkTrigger(s)){
+    // updTrigStatus já mostra o status — não precisa logar aqui
+    return;
+  }
 
   const mn=gf(s==='u'?'tminU':'tminD');
   const mx=gf(s==='u'?'tmaxU':'tmaxD');
   const sz=gf(s==='u'?'szU':'szD');
-  const mr=gi(s==='u'?'rnU':'rnD');
+  const mr=gi(s==='u'?'rnU':'rnD')||500;
   const strongOnly=gc(s==='u'?'stU':'stD');
   const slOn=gc(s==='u'?'slU':'slD');
-  const slN=gi(s==='u'?'slNU':'slND');
+  const slN=gi(s==='u'?'slNU':'slND')||3;
   const tpEn=gc(s==='u'?'tpEnU':'tpEnD');
-  const mode=gv(s==='u'?'modeU':'modeD')||(s==='u'?'up':'down'); // default correto por bot
+  const mode=gv(s==='u'?'modeU':'modeD')||(s==='u'?'up':'down');
   const sig=E.signal;
   const m=TM[s];
+
+  // Validar parâmetros obrigatórios — qualquer inválido aborta silenciosamente
+  if(isNaN(mn)||mn<0.1||mn>0.99)return;
+  if(isNaN(mx)||mx<0.1||mx>0.99||mx<mn)return;
+  if(isNaN(sz)||sz<=0)return;
+  if(!m)return;
 
   if(B.rounds>=mr){log(`DRBot ${s==='u'?'UP':'DOWN'}: ${mr} rounds completos.`,'w');stopBot(s);return;}
 
@@ -1757,8 +1775,12 @@ function executeTrade(B){
   // Calculate time until end of current period
   const nowSec=Math.floor(Date.now()/1000);
   const periodEnd=(Math.floor(nowSec/periodSec)*periodSec+periodSec)*1000;
-  const dur=Math.max(1000,periodEnd-Date.now());
-  // log de aviso movido para depois da declaração de actualDir
+  const dur=periodEnd-Date.now();
+  // Não entrar se restam menos de 30s — evita resolução no período errado
+  if(dur<30000){
+    // silencioso — não logar para não spammar
+    return;
+  }
 
   // Win probability based on edge + direction alignment
   let wp=0.52;
@@ -1774,7 +1796,6 @@ function executeTrade(B){
   const _seed=((B.rounds*7919)+(Date.now()%10000)+Math.floor(Math.random()*1000))%1000;
   const polyP=Math.max(mn,Math.min(mx,parseFloat((mn+(_seed/1000)*(mx-mn)).toFixed(2))));
   const actualDir=effectiveDir==='up'?'UP':'DOWN';
-  if(dur<10000)log(`⚠ ${actualDir} entrada perto do fechamento (${Math.round(dur/1000)}s restantes)`,'w');
   const et=strong?(effectiveDir==='up'?'⚡↑':'⚡↓'):'';
   const tag=apiConfigured()?'[REAL]':'[SIM]';
   const entryTime=now();
