@@ -690,9 +690,10 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
           <div class="ov-pnl-lbl">P&L USDC</div>
         </div>
       </div>
-      <div class="stats-grid cols3">
+      <div class="stats-grid" style="grid-template-columns:repeat(4,1fr)">
         <div class="stat-box"><div class="stat-lbl">Rounds</div><div class="stat-val gold" id="ovUpR">0</div></div>
         <div class="stat-box"><div class="stat-lbl">Wins</div><div class="stat-val up" id="ovUpW">0</div></div>
+        <div class="stat-box"><div class="stat-lbl">Losses</div><div class="stat-val dn" id="ovUpL">0</div></div>
         <div class="stat-box"><div class="stat-lbl">% Acerto</div><div class="stat-val" id="ovUpWR" style="color:var(--txt2)">—</div></div>
       </div>
       <div class="bridge" id="brUp"><div class="bridge-ico" id="brUpIco">🔗</div><div class="bridge-info"><div class="bridge-name">BRIDGE UP</div><div class="bridge-st wait" id="brUpSt">Aguardando...</div></div></div>
@@ -709,9 +710,10 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
           <div class="ov-pnl-lbl">P&L USDC</div>
         </div>
       </div>
-      <div class="stats-grid cols3">
+      <div class="stats-grid" style="grid-template-columns:repeat(4,1fr)">
         <div class="stat-box"><div class="stat-lbl">Rounds</div><div class="stat-val gold" id="ovDnR">0</div></div>
         <div class="stat-box"><div class="stat-lbl">Wins</div><div class="stat-val up" id="ovDnW">0</div></div>
+        <div class="stat-box"><div class="stat-lbl">Losses</div><div class="stat-val dn" id="ovDnL">0</div></div>
         <div class="stat-box"><div class="stat-lbl">% Acerto</div><div class="stat-val" id="ovDnWR" style="color:var(--txt2)">—</div></div>
       </div>
       <div class="bridge" id="brDn"><div class="bridge-ico" id="brDnIco">🔗</div><div class="bridge-info"><div class="bridge-name">BRIDGE DOWN</div><div class="bridge-st wait" id="brDnSt">Aguardando...</div></div></div>
@@ -719,9 +721,10 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
     <!-- Combined -->
     <div class="combined-box">
       <div style="font-family:'JetBrains Mono',monospace;font-size:7px;color:var(--txt3);letter-spacing:1px;margin-bottom:7px;">TOTAL COMBINADO</div>
-      <div class="stats-grid">
+      <div class="stats-grid" style="grid-template-columns:repeat(5,1fr)">
         <div class="stat-box"><div class="stat-lbl">Rounds</div><div class="stat-val gold" id="totR">0</div></div>
         <div class="stat-box"><div class="stat-lbl">Wins</div><div class="stat-val up" id="totW">0</div></div>
+        <div class="stat-box"><div class="stat-lbl">Losses</div><div class="stat-val dn" id="totL">0</div></div>
         <div class="stat-box"><div class="stat-lbl">% Acerto</div><div class="stat-val" id="totWR" style="color:var(--txt2)">—</div></div>
         <div class="stat-box"><div class="stat-lbl">P&L Total</div><div class="stat-val" id="totPnl" style="color:var(--txt2)">+0.00</div></div>
       </div>
@@ -794,7 +797,7 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
           </div>
           <div class="fld"><label>Modo</label>
             <select id="modeU">
-              <option value="up">Will BTC go UP?</option>
+              <option value="up" selected>Will BTC go UP?</option>
               <option value="down">Will BTC go DOWN?</option>
               <option value="auto">🤖 AUTO (edge define)</option>
             </select>
@@ -1019,9 +1022,9 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
           </div>
           <div class="fld"><label>Modo</label>
             <select id="modeD">
-              <option value="down">Will BTC go DOWN?</option>
+              <option value="down" selected>Will BTC go DOWN?</option>
               <option value="up">Will BTC go UP?</option>
-              <option value="auto" selected>🤖 AUTO (edge define)</option>
+              <option value="auto">🤖 AUTO (edge define)</option>
             </select>
           </div>
         </div>
@@ -1206,7 +1209,7 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
 // ════════════════════════════════════════════════════════
 
 // ── State ──
-const E={sym:'BTCUSDT',lbl:'BTC',price:null,prev:null,open:null,high:null,low:null,ticks:0,hist:[],ws:null,range:30,signal:'neutral',momentum:0,periodRef:null,periodRefStart:null};
+const E={sym:'BTCUSDT',lbl:'BTC',price:null,prev:null,open:null,high:null,low:null,ticks:0,hist:[],ws:null,range:30,signal:'neutral',momentum:0,periodRef:null,periodRefStart:null,_dayKey:null};
 const BU={dir:'u',running:false,rounds:0,wins:0,losses:0,pnl:0,consec:0,_last:null,pnlHist:[0],inTrade:false,periodOpen:null,periodStart:null};
 const BD={dir:'d',running:false,rounds:0,wins:0,losses:0,pnl:0,consec:0,_last:null,pnlHist:[0],inTrade:false,periodOpen:null,periodStart:null};
 const TM={u:'abs',d:'abs'}; // default: Valor Absoluto
@@ -1316,9 +1319,10 @@ function setWS(c,l){g('wsPill').className='ws-pill '+c;g('wsLbl').textContent=l;
 function onTick(price,ts){
   _lastTick=Date.now();
   E.prev=E.price;E.price=price;E.ticks++;
-  if(!E.open)E.open=price;
-  if(!E.high||price>E.high)E.high=price;
-  if(!E.low||price<E.low)E.low=price;
+  // Resetar E.open/high/low a cada novo dia UTC
+  const _dayKey=new Date().toISOString().slice(0,10);
+  if(E._dayKey!==_dayKey){E.open=price;E.high=price;E.low=price;E._dayKey=_dayKey;}
+  else{if(!E.open)E.open=price;if(!E.high||price>E.high)E.high=price;if(!E.low||price<E.low)E.low=price;}
   const t=Date.now(); // usa tempo local sempre para consistência
   E.hist.push({t,p:price});
   E.hist=E.hist.filter(x=>x.t>Date.now()-600000);
@@ -1409,12 +1413,13 @@ function renderEdge(){
   if(E.hist.length<win)return;
   const sl=E.hist.slice(-win).map(x=>x.p);
   const mom=(sl[sl.length-1]-sl[0])/sl[0];
-  // MAX escala com o threshold para melhor sensibilidade
-  const upT2=gf('upThresh')||0.05,dnT2=gf('dnThresh')||0.05;
-  const MAX=Math.max(0.001,Math.max(upT2,dnT2)*0.006);
+  // MAX define a escala de normalização do momentum
+  // 0.003 = 0.3% de variação nos últimos N ticks = sinal forte
+  const MAX=0.003;
   const norm=Math.max(0,Math.min(1,(mom+MAX)/(2*MAX))),nm=norm-0.5;
-  // threshold mapeado para escala nm [0..0.5]
-  const upT=Math.min(0.45,upT2/10),dnT=Math.min(0.45,dnT2/10);
+  // threshold lido diretamente do campo (escala 0..0.5)
+  const upT2=gf('upThresh')||0.05,dnT2=gf('dnThresh')||0.05;
+  const upT=Math.min(0.45,upT2),dnT=Math.min(0.45,dnT2);
   let sig,cls,lbl,col;
   if(nm>upT){sig='sup';cls='edge-sup';lbl='🟢 FORTE UP';col='var(--up)';}
   else if(nm>0.02){sig='wup';cls='edge-wup';lbl='🟡 FRACO UP';col='var(--up2)';}
@@ -1469,8 +1474,8 @@ function updTrigStatus(s){
   if(!E.price){if(stEl)stEl.innerHTML='<span style="color:var(--txt3)">Aguardando preço...</span>';return;}
   const B=s==='u'?BU:BD;
   const m=TM[s];
-  if(!B.periodOpen){if(stEl)stEl.innerHTML='<span style="color:var(--txt3)">Aguardando ref...</span>';return;}
-  const ref=B.periodOpen;
+  const ref=E.periodRef||B.periodOpen;
+  if(!ref){if(stEl)stEl.innerHTML='<span style="color:var(--txt3)">Aguardando ref...</span>';return;}
   const diff=E.price-ref;
   const diffPct=ref>0?(diff/ref*100):0;
   let parts=[`<span style="color:var(--txt3)">ref:$${ref.toFixed(0)} agora:$${E.price.toFixed(0)}</span>`];
@@ -1506,8 +1511,8 @@ function checkTrigger(s){
   if(!E.price)return false;
   const B=s==='u'?BU:BD;
   const m=TM[s];
-  if(!B.periodOpen)return false;
-  const ref=B.periodOpen;
+  const ref=E.periodRef||B.periodOpen;
+  if(!ref)return false;
   const diff=E.price-ref;
   const diffPct=ref>0?(diff/ref*100):0;
   let pOk=true,aOk=true;
@@ -1567,6 +1572,10 @@ function startBot(s){
   const m=TM[s];
   if(m==='abs'||m==='both'){const d=gf(s==='u'?'tavU':'tavD');if(isNaN(d)||d<=0){toast('⚠ Insira valor $ > 0');return;}}
   if(m==='pct'||m==='both'){const t=gf(s==='u'?'tpvU':'tpvD');if(isNaN(t)||t<=0){toast('⚠ Insira % > 0');return;}}
+  // Avisar se modo AUTO (pode não entrar com edge neutro)
+  if((gv(s==='u'?'modeU':'modeD')||'') === 'auto'){
+    log(`⚠ DRBot ${s==='u'?'UP':'DOWN'} em modo AUTO — só entra com sinal de edge. Use modo fixo para entrar sempre.`,'w');
+  }
   B.running=true;B.inTrade=false;
   // Alinhar periodStart com início real do período do relógio
   const _tf=gv(s==='u'?'tfU':'tfD')||'15m';
@@ -1681,7 +1690,7 @@ function executeTrade(B){
   // Direction logic
   const isUp=sig==='sup'||sig==='wup',isDn=sig==='sdn'||sig==='wdn';
   const strong=sig==='sup'||sig==='sdn';
-  let effectiveDir=mode;
+  let effectiveDir=mode; // será congelado abaixo
   if(mode==='auto'){
     if(sig==='sup'||sig==='wup')effectiveDir='up';
     else if(sig==='sdn'||sig==='wdn')effectiveDir='down';
@@ -1696,8 +1705,10 @@ function executeTrade(B){
   // "Só sinal FORTE" — only applies to % mode
   if(strongOnly&&m!=='abs'&&!strong)return;
 
+  // Congelar effectiveDir — closure do setTimeout deve usar valor fixo
+  const frozenDir=effectiveDir; // imutável a partir daqui
   // Capture refs BEFORE setTimeout
-  const periodRefAtEntry=B.periodOpen||E.price;
+  const periodRefAtEntry=E.periodRef||B.periodOpen||E.price;
   const priceAtEntry=E.price;
   const entryDiff=parseFloat((priceAtEntry-periodRefAtEntry).toFixed(0));
   const tIn=getPeriodElapsed(s); // segundos desde início do período
@@ -1720,8 +1731,9 @@ function executeTrade(B){
   // PolyP: valor variável dentro do range (simulação realista)
   // Usa módulo do timestamp para variar a cada entrada
   // polyP: pseudo-aleatório baseado em rounds+ms, sempre dentro de mn..mx
-  const _seed=((B.rounds*7919)+(Date.now()%10000))%1000;
-  const polyP=parseFloat((mn+(_seed/1000)*(mx-mn)).toFixed(2));
+  // polyP: combina rounds, timestamp e random para máxima variação dentro do range
+  const _seed=((B.rounds*7919)+(Date.now()%10000)+Math.floor(Math.random()*1000))%1000;
+  const polyP=Math.max(mn,Math.min(mx,parseFloat((mn+(_seed/1000)*(mx-mn)).toFixed(2))));
   const actualDir=effectiveDir==='up'?'UP':'DOWN';
   if(dur<10000)log(`⚠ ${actualDir} entrada perto do fechamento (${Math.round(dur/1000)}s restantes)`,'w');
   const et=strong?(effectiveDir==='up'?'⚡↑':'⚡↓'):'';
@@ -1742,8 +1754,9 @@ function executeTrade(B){
 
     const finalPrice=E.price||priceAtEntry;
     const finalDiff=finalPrice-periodRefAtEntry;
-    // Resolution: UP wins if finalPrice >= periodRef, DOWN wins if finalPrice < periodRef
-    const win=effectiveDir==='up'?(finalDiff>=0):(finalDiff<0);
+    // REGRA: UP wins se finalPrice >= ref | DOWN wins se finalPrice < ref
+    // Usa frozenDir (capturado antes do setTimeout) para evitar closure bug
+    const win=frozenDir==='up'?(finalPrice>=periodRefAtEntry):(finalPrice<periodRefAtEntry);
 
     const shares=sz/polyP;
     const profit=parseFloat((shares-sz).toFixed(2));
@@ -1752,11 +1765,14 @@ function executeTrade(B){
     B.pnlHist.push(B.pnl);
     if(win){B.wins++;B.consec=0;}else{B.losses++;B.consec++;}
     B.inTrade=false;_gLock=false;B._last=Date.now();
-    // periodOpen mantido — só muda quando novo período começa (gerenciado em onTick)
 
     const pct=(win?(profit/sz*100):-100).toFixed(1);
-    if(win)log(`${tag} ${actualDir} #${B.rounds} ✓ +${profit.toFixed(2)} USDC (+${pct}%) · ref:$${periodRefAtEntry.toFixed(0)} final:$${finalPrice.toFixed(0)} diff:${finalDiff>=0?'+':''}$${finalDiff.toFixed(0)}`,'s');
-    else   log(`${tag} ${actualDir} #${B.rounds} ✗ -${sz.toFixed(2)} USDC · ref:$${periodRefAtEntry.toFixed(0)} final:$${finalPrice.toFixed(0)} diff:${finalDiff>=0?'+':''}$${finalDiff.toFixed(0)}`,'e');
+    const dirLabel=frozenDir==='up'?'UP':'DOWN';
+    const resMsg=frozenDir==='up'
+      ?`final $${finalPrice.toFixed(2)} ${finalPrice>=periodRefAtEntry?'≥':'<'} ref $${periodRefAtEntry.toFixed(2)} → ${finalPrice>=periodRefAtEntry?'UP WIN':'UP LOSS'}`
+      :`final $${finalPrice.toFixed(2)} ${finalPrice<periodRefAtEntry?'<':'≥'} ref $${periodRefAtEntry.toFixed(2)} → ${finalPrice<periodRefAtEntry?'DN WIN':'DN LOSS'}`;
+    if(win)log(`${tag} ${dirLabel} #${B.rounds} ✓ WIN · ${resMsg} · +${profit.toFixed(2)} USDC`,'s');
+    else   log(`${tag} ${dirLabel} #${B.rounds} ✗ LOSS · ${resMsg} · -${sz.toFixed(2)} USDC`,'e');
 
     addTradeRow(s,B.rounds,et,sz,win,pd,Math.round(polyP*100),entryTime,entryDiff,tIn);
     updOV(s);drawPnlChart(s);flash(win);updBridges();updLabel(s);saveHistory();
@@ -1799,19 +1815,21 @@ function addTradeRow(s,n,et,sz,win,pd,polyP,entryTime,entryDiff,tIn){
 // ── Overview ──
 function updOV(s){
   const B=s==='u'?BU:BD,px=s==='u'?'ovUp':'ovDn';
-  const r=g(px+'R'),w=g(px+'W'),pe=g(px+'Pnl'),wr=g(px+'WR'),st=g(s==='u'?'ovUpSt':'ovDnSt');
+  const r=g(px+'R'),w=g(px+'W'),l=g(px+'L'),pe=g(px+'Pnl'),wr=g(px+'WR'),st=g(s==='u'?'ovUpSt':'ovDnSt');
   if(r)r.textContent=B.rounds;
   if(w)w.textContent=B.wins;
+  if(l)l.textContent=B.losses;
   if(pe){pe.textContent=(B.pnl>=0?'+':'')+B.pnl.toFixed(2);pe.style.color=B.pnl>=0?'var(--up)':'var(--dn)';}
   if(wr){const p=B.rounds?Math.round(B.wins/B.rounds*100):0;wr.textContent=B.rounds?p+'%':'—';wr.style.color=p>=55?'var(--up)':p>=45?'var(--gold)':'var(--dn)';}
   if(st){st.textContent=B.running?(B.inTrade?'⏳ EM TRADE':'RODANDO'):'PARADO';st.style.color=B.running?(B.inTrade?'var(--gold)':(s==='u'?'var(--up)':'var(--dn)')):'var(--txt3)';}
   // Combined totals
-  const totR=BU.rounds+BD.rounds,totW=BU.wins+BD.wins;
+  const totR=BU.rounds+BD.rounds,totW=BU.wins+BD.wins,totLoss=BU.losses+BD.losses;
   const totPnl=parseFloat((BU.pnl+BD.pnl).toFixed(2));
   const totPct=totR?Math.round(totW/totR*100):0;
-  const tR=g('totR'),tW=g('totW'),tWR=g('totWR'),tP=g('totPnl');
+  const tR=g('totR'),tW=g('totW'),tL=g('totL'),tWR=g('totWR'),tP=g('totPnl');
   if(tR)tR.textContent=totR;
   if(tW)tW.textContent=totW;
+  if(tL)tL.textContent=totLoss;
   if(tWR){tWR.textContent=totR?totPct+'%':'—';tWR.style.color=totPct>=55?'var(--up)':totPct>=45?'var(--gold)':'var(--dn)';}
   if(tP){tP.textContent=(totPnl>=0?'+':'')+totPnl.toFixed(2)+' USDC';tP.style.color=totPnl>=0?'var(--up)':'var(--dn)';}
 }
