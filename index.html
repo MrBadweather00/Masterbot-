@@ -598,6 +598,12 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
             <div class="hero-pill pill-neu" id="heroPill">—</div>
           </div>
           <div class="hero-meta" id="heroMeta">Aguardando WebSocket...</div>
+          <!-- Preço a ser batido — igual ao Polymarket -->
+          <div style="display:flex;align-items:center;gap:10px;margin-top:5px;padding:6px 8px;background:var(--bg3);border-radius:7px;flex-wrap:wrap;">
+            <div style="font-family:'JetBrains Mono',monospace;font-size:7px;color:var(--txt3)">PREÇO A SER BATIDO</div>
+            <div style="font-family:'Bebas Neue',sans-serif;font-size:16px;color:var(--white);letter-spacing:1px" id="refPriceDisplay">—</div>
+            <div style="font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;margin-left:4px" id="refDeltaDisplay">—</div>
+          </div>
         </div>
         <div class="mkt-row">
           <div class="mkt-cell"><div class="mkt-lbl">HIGH</div><div class="mkt-val gold" id="mHigh">—</div></div>
@@ -847,7 +853,7 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
         <div class="fld" style="margin-top:6px;background:var(--bg3);border-radius:7px;padding:8px;border:1px solid var(--b1);">
           <label style="color:var(--gold)">⚡ Delta mínimo ($) — gatilho de entrada</label>
           <div class="fld-row" style="margin-top:4px">
-            <input type="number" id="tavU" value="10" min="1" step="5" style="font-size:15px;font-weight:700;color:var(--white)">
+            <input type="number" id="tavU" value="10" min="1" step="5" style="font-size:15px;font-weight:700;color:#1a2530;background:var(--white)">
             <span class="fld-unit" style="font-size:12px;color:var(--gold)">$</span>
           </div>
           <div class="fld-hint">UP: entra se preço atual ≥ ref + $<span id="tavULbl">10</span> · BTC precisa subir este valor desde abertura</div>
@@ -1071,7 +1077,7 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
         <div class="fld" style="margin-top:6px;background:var(--bg3);border-radius:7px;padding:8px;border:1px solid var(--b1);">
           <label style="color:var(--dn)">⚡ Delta mínimo ($) — gatilho de entrada</label>
           <div class="fld-row" style="margin-top:4px">
-            <input type="number" id="tavD" value="10" min="1" step="5" style="font-size:15px;font-weight:700;color:var(--white)">
+            <input type="number" id="tavD" value="10" min="1" step="5" style="font-size:15px;font-weight:700;color:#1a2530;background:var(--white)">
             <span class="fld-unit" style="font-size:12px;color:var(--dn)">$</span>
           </div>
           <div class="fld-hint">DOWN: entra se preço atual ≤ ref − $<span id="tavDLbl">10</span> · BTC precisa cair este valor desde abertura</div>
@@ -1302,6 +1308,29 @@ async function fetchKlineOpen(sym,tf,pStartMs){
   }
 }
 
+
+// ── Preço Chainlink (referência Polymarket) ──
+// Atualiza a cada 15s — mesmo ritmo do Chainlink on-chain
+let _clPrice=null,_clFetching=false;
+async function fetchChainlinkPrice(){
+  if(_clFetching)return;
+  _clFetching=true;
+  try{
+    // CryptoCompare agrega múltiplas exchanges similar ao Chainlink
+    const r=await fetch('https://min-api.cryptocompare.com/data/price?fsym=BTC&tsyms=USD&extraParams=masterbot');
+    const d=await r.json();
+    if(d&&d.USD){
+      _clPrice=d.USD;
+      // Atualizar E.periodRef se ainda não tiver kline mais preciso
+      const srcDot=g('srcDot');
+      if(srcDot)srcDot.title=`Chainlink ref: $${_clPrice.toFixed(2)}`;
+    }
+  }catch(e){}
+  _clFetching=false;
+}
+fetchChainlinkPrice();
+setInterval(fetchChainlinkPrice,15000);
+
 // ── WebSocket ──
 function connectWS(){
   setWS('wait','CONECTANDO');
@@ -1372,14 +1401,24 @@ function updSrcLabel(){
 // ── Delta do período (atualiza a cada tick) ──
 function updDelta(){
   const deltaEl=g('clockDelta');
-  if(!deltaEl)return;
+  const refDisp=g('refPriceDisplay');
+  const refDelta=g('refDeltaDisplay');
   const ref=E.periodRef;
-  if(!ref||!E.price){deltaEl.innerHTML='<span style="color:var(--txt3)">Aguardando ref...</span>';return;}
+  if(!ref||!E.price){
+    if(deltaEl)deltaEl.innerHTML='<span style="color:var(--txt3)">Aguardando ref...</span>';
+    if(refDisp)refDisp.textContent='—';
+    if(refDelta)refDelta.textContent='—';
+    return;
+  }
   const d=E.price-ref;
   const col=d>=0?'var(--up)':'var(--dn)';
   const arrow=d>=0?'▲':'▼';
   const sign=d>=0?'+':'';
-  deltaEl.innerHTML=`<span style="color:var(--txt3);font-size:7px">Δ período (ref $${ref.toFixed(2)}): </span><span style="color:${col};font-weight:700;font-size:12px">${arrow} ${sign}$${d.toFixed(2)}</span>`;
+  // Relógio delta
+  if(deltaEl)deltaEl.innerHTML=`<span style="color:var(--txt3);font-size:7px">Δ período (ref $${ref.toFixed(2)}): </span><span style="color:${col};font-weight:700;font-size:12px">${arrow} ${sign}$${d.toFixed(2)}</span>`;
+  // Hero display — preço a ser batido
+  if(refDisp)refDisp.textContent='$'+ref.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+  if(refDelta){refDelta.textContent=`${arrow} ${sign}$${d.toFixed(2)}`;refDelta.style.color=col;}
 }
 
 // ── Render ──
