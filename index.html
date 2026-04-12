@@ -1215,7 +1215,7 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
 // ════════════════════════════════════════════════════════
 
 // ── State ──
-const E={sym:'BTCUSDT',lbl:'BTC',price:null,prev:null,open:null,high:null,low:null,ticks:0,hist:[],ws:null,range:30,signal:'neutral',momentum:0,periodRef:null,periodRefStart:null,_dayKey:null};
+const E={sym:'BTCUSDT',lbl:'BTC',price:null,prev:null,open:null,high:null,low:null,ticks:0,hist:[],ws:null,range:30,signal:'neutral',momentum:0,periodRef:null,periodRefStart:null,_dayKey:null,displayPrice:null,displayPrev:null};
 const BU={dir:'u',running:false,rounds:0,wins:0,losses:0,pnl:0,consec:0,_last:null,pnlHist:[0],inTrade:false,periodOpen:null,periodStart:null};
 const BD={dir:'d',running:false,rounds:0,wins:0,losses:0,pnl:0,consec:0,_last:null,pnlHist:[0],inTrade:false,periodOpen:null,periodStart:null};
 const TM={u:'abs',d:'abs'}; // default: Valor Absoluto
@@ -1348,6 +1348,10 @@ function setWS(c,l){g('wsPill').className='ws-pill '+c;g('wsLbl').textContent=l;
 function onTick(price,ts){
   _lastTick=Date.now();
   E.prev=E.price;E.price=price;E.ticks++;
+  // EMA para display suavizado (alpha=0.08 ≈ suave mas responsivo)
+  E.displayPrev=E.displayPrice;
+  if(E.displayPrice===null)E.displayPrice=price;
+  else E.displayPrice=E.displayPrice*0.92+price*0.08;
   // Resetar E.open/high/low a cada novo dia UTC
   const _dayKey=new Date().toISOString().slice(0,10);
   if(E._dayKey!==_dayKey){E.open=price;E.high=price;E.low=price;E._dayKey=_dayKey;}
@@ -1410,7 +1414,9 @@ function updDelta(){
     if(refDelta)refDelta.textContent='—';
     return;
   }
-  const d=E.price-ref;
+  // Usar displayPrice para delta visual (suavizado)
+  const dispPrice=E.displayPrice||E.price;
+  const d=dispPrice-ref;
   const col=d>=0?'var(--up)':'var(--dn)';
   const arrow=d>=0?'▲':'▼';
   const sign=d>=0?'+':'';
@@ -1423,11 +1429,15 @@ function updDelta(){
 
 // ── Render ──
 function renderPrice(){
-  const el=g('heroPrice'),dir=E.prev?(E.price>E.prev?'up':'dn'):'';
-  el.textContent=fp(E.price);
+  // Usar displayPrice (EMA suavizada) para visual, E.price para lógica
+  const disp=E.displayPrice||E.price;
+  const el=g('heroPrice');
+  // Flash só quando preço real muda de direção
+  const dir=E.prev?(E.price>E.prev?'up':'dn'):'';
+  el.textContent=fp(disp);
   if(dir){el.classList.add('flash-'+dir);setTimeout(()=>el.classList.remove('flash-up','flash-dn'),220);}
-  if(E.open){
-    const pct=(E.price-E.open)/E.open*100;
+  if(E.open&&disp){
+    const pct=(disp-E.open)/E.open*100;
     const pill=g('heroPill');
     pill.textContent=(pct>=0?'+':'')+pct.toFixed(3)+'%';
     pill.className='hero-pill '+(pct>0?'pill-up':pct<0?'pill-dn':'pill-neu');
@@ -1776,11 +1786,9 @@ function executeTrade(B){
   const nowSec=Math.floor(Date.now()/1000);
   const periodEnd=(Math.floor(nowSec/periodSec)*periodSec+periodSec)*1000;
   const dur=periodEnd-Date.now();
-  // Não entrar se restam menos de 30s — evita resolução no período errado
-  if(dur<30000){
-    // silencioso — não logar para não spammar
-    return;
-  }
+  // Bloquear apenas se restar menos de 5s — evita setTimeout no período errado
+  // A janela de tempo customizável (ptMinEnd) já controla quando parar
+  if(dur<5000)return;
 
   // Win probability based on edge + direction alignment
   let wp=0.52;
@@ -2027,7 +2035,7 @@ g('chips').addEventListener('click',ev=>{
   const c=ev.target.closest('.chip');if(!c)return;
   document.querySelectorAll('.chip').forEach(x=>x.classList.remove('active'));c.classList.add('active');
   E.sym=c.dataset.sym;E.lbl=c.dataset.lbl;
-  E.price=null;E.prev=null;E.open=null;E.high=null;E.low=null;E.ticks=0;E.hist=[];E.signal='neutral';E.momentum=0;E.periodRef=null;E.periodRefStart=null;
+  E.price=null;E.prev=null;E.open=null;E.high=null;E.low=null;E.ticks=0;E.hist=[];E.signal='neutral';E.momentum=0;E.periodRef=null;E.periodRefStart=null;E.displayPrice=null;E.displayPrev=null;
   g('heroAsset').textContent=E.lbl+' / USDT';
   g('heroPrice').textContent='—';
   if(E.ws){E.ws._kill=true;try{E.ws.close();}catch(e){}}
