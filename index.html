@@ -149,6 +149,8 @@ transition:all .2s;display:flex;align-items:center;justify-content:center;gap:6p
 }
 .tab-dot{width:6px;height:6px;border-radius:50%;background:currentColor;opacity:.3;}
 .tab-btn.ae{color:var(–gold);border-bottom-color:var(–gold);}
+.tab-btn.aa{color:var(–blue);border-bottom-color:var(–blue);}
+.tab-btn.aa .tab-dot{opacity:1;box-shadow:0 0 6px var(–blue);}
 .tab-btn.ae .tab-dot{opacity:1;box-shadow:0 0 6px var(–gold);}
 .tab-btn.au{color:var(–up);border-bottom-color:var(–up);}
 .tab-btn.au .tab-dot{opacity:1;box-shadow:0 0 6px var(–up);}
@@ -573,6 +575,7 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
   <button class="tab-btn ae" id="tabE" onclick="switchTab('e')"><div class="tab-dot"></div>EDGEBOT</button>
   <button class="tab-btn" id="tabU" onclick="switchTab('u')"><div class="tab-dot"></div>DRBOT ↑ UP</button>
   <button class="tab-btn" id="tabD" onclick="switchTab('d')"><div class="tab-dot"></div>DRBOT ↓ DOWN</button>
+  <button class="tab-btn" id="tabA" onclick="switchTab('a')"><div class="tab-dot" style="background:var(--blue)"></div>ANÁLISE</button>
 </div>
 
 <!-- ═══ EDGEBOT TAB ═══ -->
@@ -1206,6 +1209,69 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
   </div>
 </div>
 
+<!-- ═══ ANÁLISE DE RESULTADOS ═══ -->
+
+<div class="tab-panel" id="panelA">
+  <div class="pbody" style="max-width:900px;margin:0 auto;">
+
+```
+<div class="sec">📊 Análise de Resultados</div>
+<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
+  <button class="btn" onclick="runAnalysis()" style="background:var(--blue2);color:#fff;padding:8px 18px">🔍 Analisar Histórico</button>
+  <button class="btn btn-reset" onclick="clearAnalysis()">↺ Limpar</button>
+</div>
+
+<!-- Resumo geral -->
+<div id="analysisOutput" style="display:none">
+
+  <!-- Cards de resumo -->
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px" id="analysisSummaryCards"></div>
+
+  <!-- Melhor estratégia -->
+  <div class="card" style="margin-bottom:10px">
+    <div class="sec" style="margin-top:0">🏆 Melhor Estratégia Identificada</div>
+    <div id="bestStrategy" style="font-family:'JetBrains Mono',monospace;font-size:9px;line-height:1.8;color:var(--txt)"></div>
+  </div>
+
+  <!-- Análise por bot -->
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+    <div class="card">
+      <div class="sec" style="margin-top:0;color:var(--up)">↑ DRBOT UP</div>
+      <div id="analysisUp" style="font-family:'JetBrains Mono',monospace;font-size:8px;line-height:1.8;color:var(--txt)"></div>
+    </div>
+    <div class="card">
+      <div class="sec" style="margin-top:0;color:var(--dn)">↓ DRBOT DOWN</div>
+      <div id="analysisDn" style="font-family:'JetBrains Mono',monospace;font-size:8px;line-height:1.8;color:var(--txt)"></div>
+    </div>
+  </div>
+
+  <!-- Análise por faixa de preço (¢) -->
+  <div class="card" style="margin-bottom:10px">
+    <div class="sec" style="margin-top:0">💰 Performance por Faixa de Preço (¢)</div>
+    <div id="analysisByPrice" style="font-family:'JetBrains Mono',monospace;font-size:8px"></div>
+  </div>
+
+  <!-- Análise por delta de entrada -->
+  <div class="card" style="margin-bottom:10px">
+    <div class="sec" style="margin-top:0">📈 Performance por Δ de Entrada</div>
+    <div id="analysisByDelta" style="font-family:'JetBrains Mono',monospace;font-size:8px"></div>
+  </div>
+
+  <!-- Sequências -->
+  <div class="card">
+    <div class="sec" style="margin-top:0">🔄 Análise de Sequências</div>
+    <div id="analysisSequence" style="font-family:'JetBrains Mono',monospace;font-size:8px;line-height:1.8;color:var(--txt)"></div>
+  </div>
+
+</div>
+<div id="analysisEmpty" style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--txt3);padding:20px;text-align:center">
+  Nenhum histórico disponível. Execute os bots primeiro e clique em Analisar.
+</div>
+```
+
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 </div><!-- end appContent -->
 
@@ -1501,15 +1567,34 @@ function updBr(s){
   else if(B.inTrade){cls='';ico='⏳';msg='Em trade — aguardando resultado...';sc='wait';}
   else if(_gLock&&!B.inTrade){cls='lock';ico='🔒';msg='Aguardando — outro bot em trade';sc='lock';}
   else if(s==='u'){
-    if(sUp){cls='up';ico='⚡';msg='ARMADO — FORTE UP detectado';sc='up';}
-    else if(isUp){cls='';ico='🔍';msg='Sinal fraco UP — monitorando...';sc='wait';}
-    else if(isDn){cls='lock';ico='🚫';msg='Bloqueado — Edge DOWN ativo';sc='lock';}
-    else{cls='';ico='🔍';msg='Neutro — aguardando sinal UP';sc='wait';}
+    const modeU=gv('modeU')||'up';
+    const absMode=TM['u']==='abs';
+    if(absMode){
+      // Modo abs: edge não bloqueia, só informa
+      if(sUp){cls='up';ico='⚡';msg='FORTE UP · aguardando trigger $';sc='up';}
+      else if(isUp){cls='up';ico='🔍';msg='Fraco UP · aguardando trigger $';sc='up';}
+      else if(isDn){cls='';ico='🔍';msg='Edge DOWN · aguardando trigger $ UP';sc='wait';}
+      else{cls='';ico='🔍';msg='Neutro · aguardando trigger $';sc='wait';}
+    } else {
+      if(sUp){cls='up';ico='⚡';msg='ARMADO — FORTE UP detectado';sc='up';}
+      else if(isUp){cls='';ico='🔍';msg='Sinal fraco UP — monitorando...';sc='wait';}
+      else if(isDn){cls='lock';ico='🚫';msg='Bloqueado — Edge DOWN ativo';sc='lock';}
+      else{cls='';ico='🔍';msg='Neutro — aguardando sinal UP';sc='wait';}
+    }
   }else{
-    if(sDn){cls='dn';ico='⚡';msg='ARMADO — FORTE DOWN detectado';sc='dn';}
-    else if(isDn){cls='';ico='🔍';msg='Sinal fraco DOWN — monitorando...';sc='wait';}
-    else if(isUp){cls='lock';ico='🚫';msg='Bloqueado — Edge UP ativo';sc='lock';}
-    else{cls='';ico='🔍';msg='Neutro — aguardando sinal DOWN';sc='wait';}
+    const absMode=TM['d']==='abs';
+    if(absMode){
+      // Modo abs: edge não bloqueia
+      if(sDn){cls='dn';ico='⚡';msg='FORTE DOWN · aguardando trigger $';sc='dn';}
+      else if(isDn){cls='dn';ico='🔍';msg='Fraco DOWN · aguardando trigger $';sc='dn';}
+      else if(isUp){cls='';ico='🔍';msg='Edge UP · aguardando trigger $ DOWN';sc='wait';}
+      else{cls='';ico='🔍';msg='Neutro · aguardando trigger $';sc='wait';}
+    } else {
+      if(sDn){cls='dn';ico='⚡';msg='ARMADO — FORTE DOWN detectado';sc='dn';}
+      else if(isDn){cls='';ico='🔍';msg='Sinal fraco DOWN — monitorando...';sc='wait';}
+      else if(isUp){cls='lock';ico='🚫';msg='Bloqueado — Edge UP ativo';sc='lock';}
+      else{cls='';ico='🔍';msg='Neutro — aguardando sinal DOWN';sc='wait';}
+    }
   }
   ids.forEach(id=>{const el=g(id);if(el)el.className='bridge '+cls;});
   icoIds.forEach(id=>{const el=g(id);if(el)el.textContent=ico;});
@@ -1552,7 +1637,9 @@ function updTrigStatus(s){
   const html=parts.join(' · ');
   if(stEl)stEl.innerHTML=html;
   if(inEl)inEl.innerHTML=html;
-  if(diagEl)diagEl.innerHTML=html+(B.inTrade?' · <span style="color:var(--gold)">⏳ EM TRADE</span>':_gLock?' · <span style="color:orange">🔒 LOCK</span>':'');
+  if(!B.inTrade){
+    if(diagEl)diagEl.innerHTML=html+(_gLock?' · <span style="color:orange">🔒 LOCK</span>':'');
+  }
 }
 
 // ── Trigger Check ──
@@ -1636,7 +1723,10 @@ function startBot(s){
   if(!E.periodRef||E.periodRefStart<B.periodStart){E.periodRef=E.price;E.periodRefStart=B.periodStart;fetchKlineOpen(E.sym,_tf,B.periodStart);}
   g('bs'+s.toUpperCase()).style.display='none';
   g('bx'+s.toUpperCase()).style.display='';
-  log(`DRBot ${s==='u'?'UP ↑':'DOWN ↓'} iniciado · ref: $${E.price.toFixed(2)} · trigger: ${m}`,'i');
+  const _diagMode=gv(s==='u'?'modeU':'modeD')||(s==='u'?'up':'down');
+  const _diagDelta=gf(s==='u'?'tavU':'tavD');
+  const _diagSz=gf(s==='u'?'szU':'szD');
+  log(`DRBot ${s==='u'?'UP ↑':'DOWN ↓'} iniciado · ref: $${E.price.toFixed(2)} · modo: ${_diagMode} · trigger: ${m}${m==='abs'||m==='both'?' $'+_diagDelta:''} · sz: ${_diagSz} USDC`,'i');
   startKeepalive();reqWakeLock();
   updLabel(s);updBridges();
 }
@@ -1789,13 +1879,6 @@ function executeTrade(B){
   // Bloquear apenas se restar menos de 5s — evita setTimeout no período errado
   // A janela de tempo customizável (ptMinEnd) já controla quando parar
   if(dur<5000)return;
-
-  // Win probability based on edge + direction alignment
-  let wp=0.52;
-  if(effectiveDir==='up'&&sig==='sup')wp=0.66;
-  else if(effectiveDir==='up'&&sig==='wup')wp=0.58;
-  else if(effectiveDir==='down'&&sig==='sdn')wp=0.66;
-  else if(effectiveDir==='down'&&sig==='wdn')wp=0.58;
 
   // PolyP: valor variável dentro do range (simulação realista)
   // Usa módulo do timestamp para variar a cada entrada
@@ -1963,6 +2046,194 @@ function updateClocks(){
 }
 setInterval(updateClocks,1000);
 
+
+// ── Análise de Resultados ──
+function clearAnalysis(){
+  g('analysisOutput').style.display='none';
+  g('analysisEmpty').style.display='block';
+  ['analysisSummaryCards','bestStrategy','analysisUp','analysisDn',
+   'analysisByPrice','analysisByDelta','analysisSequence'].forEach(id=>{
+    const el=g(id);if(el)el.innerHTML='';
+  });
+}
+
+function runAnalysis(){
+  // Coletar trades das tabelas HTML
+  const trades=[];
+  ['u','d'].forEach(s=>{
+    const tb=g('th'+s.toUpperCase());
+    if(!tb)return;
+    Array.from(tb.children).forEach(tr=>{
+      const tds=tr.querySelectorAll('td');
+      if(tds.length<6)return;
+      const n=parseInt(tds[0].textContent)||0;
+      const polyP=parseFloat(tds[2].textContent)||0; // ex: "65¢" → 65
+      const delta=parseFloat((tds[3].textContent||'0').replace(/[+$]/g,''))||0;
+      const tIn=tds[4].textContent||'—';
+      const win=tds[5].textContent.trim()==='WIN';
+      const pnl=parseFloat((tds[6].textContent||'0').replace('+',''))||0;
+      trades.push({bot:s,n,polyP,delta,tIn,win,pnl});
+    });
+  });
+
+  if(trades.length===0){
+    g('analysisOutput').style.display='none';
+    g('analysisEmpty').style.display='block';
+    return;
+  }
+
+  g('analysisOutput').style.display='block';
+  g('analysisEmpty').style.display='none';
+
+  const up=trades.filter(t=>t.bot==='u');
+  const dn=trades.filter(t=>t.bot==='d');
+  const total=trades.length;
+  const wins=trades.filter(t=>t.win).length;
+  const totalPnl=trades.reduce((a,t)=>a+t.pnl,0);
+  const wr=total?Math.round(wins/total*100):0;
+
+  // ── Cards resumo ──
+  const cardData=[
+    {label:'Total Rounds',val:total,col:'var(--gold)'},
+    {label:'Win Rate',val:wr+'%',col:wr>=55?'var(--up)':wr>=45?'var(--gold)':'var(--dn)'},
+    {label:'P&L Total',val:(totalPnl>=0?'+':'')+totalPnl.toFixed(2)+' USDC',col:totalPnl>=0?'var(--up)':'var(--dn)'},
+  ];
+  g('analysisSummaryCards').innerHTML=cardData.map(c=>
+    `<div class="card" style="text-align:center;padding:12px">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:7px;color:var(--txt3);margin-bottom:4px">${c.label}</div>
+      <div style="font-family:'Bebas Neue',sans-serif;font-size:22px;color:${c.col}">${c.val}</div>
+    </div>`
+  ).join('');
+
+  // ── Análise por bot ──
+  function botStats(arr,label){
+    if(!arr.length)return `<span style="color:var(--txt3)">Sem dados</span>`;
+    const w=arr.filter(t=>t.win).length;
+    const wr=Math.round(w/arr.length*100);
+    const pnl=arr.reduce((a,t)=>a+t.pnl,0);
+    const avgWin=arr.filter(t=>t.win).reduce((a,t)=>a+t.pnl,0)/(w||1);
+    const avgLoss=arr.filter(t=>!t.win).reduce((a,t)=>a+t.pnl,0)/((arr.length-w)||1);
+    const rr=Math.abs(avgWin/avgLoss).toFixed(2);
+    return [
+      `Rounds: <b style="color:var(--gold)">${arr.length}</b>`,
+      `Wins: <b style="color:var(--up)">${w}</b> · Losses: <b style="color:var(--dn)">${arr.length-w}</b>`,
+      `Win Rate: <b style="color:${wr>=55?'var(--up)':wr>=45?'var(--gold)':'var(--dn)'}">${wr}%</b>`,
+      `P&L: <b style="color:${pnl>=0?'var(--up)':'var(--dn)'}">${pnl>=0?'+':''}${pnl.toFixed(2)} USDC</b>`,
+      `Avg WIN: <b style="color:var(--up)">+${avgWin.toFixed(2)}</b> · Avg LOSS: <b style="color:var(--dn)">${avgLoss.toFixed(2)}</b>`,
+      `Risk/Reward: <b style="color:var(--blue)">${rr}x</b>`,
+    ].join('<br>');
+  }
+  g('analysisUp').innerHTML=botStats(up,'UP');
+  g('analysisDn').innerHTML=botStats(dn,'DOWN');
+
+  // ── Performance por faixa de preço ──
+  const priceRanges=[
+    {label:'40–49¢',min:40,max:49},
+    {label:'50–54¢',min:50,max:54},
+    {label:'55–59¢',min:55,max:59},
+    {label:'60–65¢',min:60,max:65},
+    {label:'66–70¢',min:66,max:70},
+    {label:'71–75¢',min:71,max:75},
+    {label:'76–80¢',min:76,max:80},
+  ];
+  let priceHtml='<table style="width:100%;border-collapse:collapse"><tr>'
+    +'<th style="text-align:left;padding:3px 6px;color:var(--txt3)">Faixa</th>'
+    +'<th style="text-align:center;color:var(--txt3)">Rounds</th>'
+    +'<th style="text-align:center;color:var(--txt3)">WR%</th>'
+    +'<th style="text-align:right;color:var(--txt3)">P&L</th></tr>';
+  priceRanges.forEach(r=>{
+    const inRange=trades.filter(t=>t.polyP>=r.min&&t.polyP<=r.max);
+    if(!inRange.length)return;
+    const w=inRange.filter(t=>t.win).length;
+    const wr=Math.round(w/inRange.length*100);
+    const pnl=inRange.reduce((a,t)=>a+t.pnl,0);
+    const wrCol=wr>=55?'var(--up)':wr>=45?'var(--gold)':'var(--dn)';
+    priceHtml+=`<tr style="border-top:1px solid var(--b1)">
+      <td style="padding:3px 6px;color:var(--blue)">${r.label}</td>
+      <td style="text-align:center;color:var(--txt)">${inRange.length}</td>
+      <td style="text-align:center;color:${wrCol};font-weight:700">${wr}%</td>
+      <td style="text-align:right;color:${pnl>=0?'var(--up)':'var(--dn)'};font-weight:700">${pnl>=0?'+':''}${pnl.toFixed(2)}</td>
+    </tr>`;
+  });
+  priceHtml+='</table>';
+  g('analysisByPrice').innerHTML=priceHtml;
+
+  // ── Performance por delta de entrada ──
+  const deltaRanges=[
+    {label:'Δ negativo (< 0)',test:d=>d<0},
+    {label:'Δ 0–5',test:d=>d>=0&&d<=5},
+    {label:'Δ 6–15',test:d=>d>5&&d<=15},
+    {label:'Δ 16–30',test:d=>d>15&&d<=30},
+    {label:'Δ 31–50',test:d=>d>30&&d<=50},
+    {label:'Δ > 50',test:d=>d>50},
+  ];
+  let deltaHtml='<table style="width:100%;border-collapse:collapse"><tr>'
+    +'<th style="text-align:left;padding:3px 6px;color:var(--txt3)">Delta entrada</th>'
+    +'<th style="text-align:center;color:var(--txt3)">Rounds</th>'
+    +'<th style="text-align:center;color:var(--txt3)">WR%</th>'
+    +'<th style="text-align:right;color:var(--txt3)">P&L</th></tr>';
+  deltaRanges.forEach(r=>{
+    const inRange=trades.filter(t=>r.test(Math.abs(t.delta)));
+    if(!inRange.length)return;
+    const w=inRange.filter(t=>t.win).length;
+    const wr=Math.round(w/inRange.length*100);
+    const pnl=inRange.reduce((a,t)=>a+t.pnl,0);
+    const wrCol=wr>=55?'var(--up)':wr>=45?'var(--gold)':'var(--dn)';
+    deltaHtml+=`<tr style="border-top:1px solid var(--b1)">
+      <td style="padding:3px 6px;color:var(--gold)">${r.label}</td>
+      <td style="text-align:center;color:var(--txt)">${inRange.length}</td>
+      <td style="text-align:center;color:${wrCol};font-weight:700">${wr}%</td>
+      <td style="text-align:right;color:${pnl>=0?'var(--up)':'var(--dn)'};font-weight:700">${pnl>=0?'+':''}${pnl.toFixed(2)}</td>
+    </tr>`;
+  });
+  deltaHtml+='</table>';
+  g('analysisByDelta').innerHTML=deltaHtml;
+
+  // ── Análise de sequências ──
+  let maxWinStreak=0,maxLossStreak=0,curW=0,curL=0;
+  trades.forEach(t=>{
+    if(t.win){curW++;curL=0;maxWinStreak=Math.max(maxWinStreak,curW);}
+    else{curL++;curW=0;maxLossStreak=Math.max(maxLossStreak,curL);}
+  });
+  const lastN=trades.slice(-10);
+  const recentWR=lastN.length?Math.round(lastN.filter(t=>t.win).length/lastN.length*100):0;
+  g('analysisSequence').innerHTML=[
+    `Maior sequência de WIN: <b style="color:var(--up)">${maxWinStreak}</b>`,
+    `Maior sequência de LOSS: <b style="color:var(--dn)">${maxLossStreak}</b>`,
+    `Win Rate últimos 10 rounds: <b style="color:${recentWR>=55?'var(--up)':recentWR>=45?'var(--gold)':'var(--dn)'}">${recentWR}%</b>`,
+    `Tendência recente: <b style="color:${recentWR>=wr?'var(--up)':'var(--dn)'}">${recentWR>=wr?'📈 Melhorando':'📉 Piorando'} vs média geral (${wr}%)</b>`,
+  ].join('<br>');
+
+  // ── Melhor estratégia ──
+  const bestPriceRange=priceRanges.map(r=>{
+    const inRange=trades.filter(t=>t.polyP>=r.min&&t.polyP<=r.max);
+    if(inRange.length<3)return null;
+    const w=inRange.filter(t=>t.win).length;
+    return{label:r.label,wr:Math.round(w/inRange.length*100),n:inRange.length};
+  }).filter(Boolean).sort((a,b)=>b.wr-a.wr)[0];
+
+  const bestBot=up.length&&dn.length?(
+    Math.round(up.filter(t=>t.win).length/up.length*100) >=
+    Math.round(dn.filter(t=>t.win).length/dn.length*100)?'UP ↑':'DOWN ↓'
+  ):(up.length?'UP ↑':'DOWN ↓');
+
+  const lines=[];
+  if(wr>=55)lines.push(`✅ <b>Estratégia rentável</b> — Win Rate ${wr}% acima do break-even (~52%)`);
+  else if(wr>=50)lines.push(`⚠️ <b>Limiar de rentabilidade</b> — Win Rate ${wr}%, revisar configurações`);
+  else lines.push(`❌ <b>Estratégia deficitária</b> — Win Rate ${wr}%, abaixo do necessário`);
+
+  lines.push(`🤖 <b>Bot com melhor performance:</b> ${bestBot}`);
+  if(bestPriceRange)lines.push(`💰 <b>Melhor faixa de preço:</b> ${bestPriceRange.label} (${bestPriceRange.wr}% WR em ${bestPriceRange.n} rounds)`);
+  if(totalPnl>0)lines.push(`💵 <b>Lucro total simulado:</b> +${totalPnl.toFixed(2)} USDC`);
+  else lines.push(`💸 <b>Prejuízo total simulado:</b> ${totalPnl.toFixed(2)} USDC`);
+
+  if(wr>=55&&total>=20)lines.push(`🚀 <b>Recomendação:</b> Resultados consistentes — candidato para teste real`);
+  else if(total<20)lines.push(`📋 <b>Recomendação:</b> Aumente o histórico (mínimo 20 rounds) para conclusões confiáveis`);
+  else lines.push(`⏳ <b>Recomendação:</b> Continue em simulação até atingir WR ≥ 55%`);
+
+  g('bestStrategy').innerHTML=lines.join('<br>');
+}
+
 // ── Charts ──
 function setRange(s){E.range=s;['10','30','60','300','3600'].forEach(r=>{const el=g('rb'+r);if(el)el.className='rbtn'+(r==s?' active':'');});drawEChart();}
 function drawEChart(){
@@ -2022,12 +2293,12 @@ function setTM(s,m){
 
 // ── Tab switch ──
 function switchTab(t){
-  ['e','u','d'].forEach(x=>{
+  ['e','u','d','a'].forEach(x=>{
     const p=g('panel'+x.toUpperCase()),b=g('tab'+x.toUpperCase());
     if(p)p.classList.toggle('active',x===t);
     if(b)b.className='tab-btn'+(x===t?' a'+x:'');
   });
-  setTimeout(()=>{drawEChart();drawPnlChart('u');drawPnlChart('d');},50);
+  setTimeout(()=>{drawEChart();drawPnlChart('u');drawPnlChart('d');if(t==='a')runAnalysis();},50);
 }
 
 // ── Asset switch ──
@@ -2172,8 +2443,8 @@ function clearHistory(){
 // ════════════════════════════════════════════════════════
 // LOGIN
 // ════════════════════════════════════════════════════════
-const USERS={'ak':'ak21','luca':'lg00'};
-const NAMES={'ak':'AK','luca':'Luca'};
+const USERS={'ak':'ak21','luca':'lg00','ps':'ps00'};
+const NAMES={'ak':'AK','luca':'Luca','ps':'PS'};
 
 function doLogin(){
   const u=(gv('loginUser')||'').trim().toLowerCase();
