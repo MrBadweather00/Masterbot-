@@ -565,6 +565,10 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
       <button id="logoutBtn" onclick="doLogout()" title="Sair">✕</button>
     </div>
     <div class="sim-badge" id="simBadge">SIM</div>
+    <div id="bgStatus" style="font-family:'JetBrains Mono',monospace;font-size:7px;color:var(--txt3);display:none">
+      <span id="bgStatusDot" style="display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--up);margin-right:3px;animation:pulse 2s infinite"></span>
+      <span id="bgStatusTxt">24H</span>
+    </div>
     <div class="ws-pill wait" id="wsPill"><div class="ws-dot"></div><span id="wsLbl">CONECTANDO</span></div>
   </div>
 </div>
@@ -1322,32 +1326,130 @@ function flash(win){
 }
 setInterval(()=>{const e=g('ovTime');if(e)e.textContent=now();},1000);
 
-// ── Keep-alive ──
+// ════════════════════════════════════════════════════
+// KEEP-ALIVE — Modo 24h para iPad/iOS
+// ════════════════════════════════════════════════════
+let _bgOscillator=null,_bgGain=null;
+
 function startKeepalive(){
   if(_audioCtx)return;
   try{
     _audioCtx=new(window.AudioContext||window.webkitAudioContext)();
-    function sched(){
-      if(!_audioCtx)return;
-      const buf=_audioCtx.createBuffer(1,_audioCtx.sampleRate*.5,_audioCtx.sampleRate);
-      const src=_audioCtx.createBufferSource();src.buffer=buf;
-      const gain=_audioCtx.createGain();gain.gain.value=0.0001;
-      src.connect(gain);gain.connect(_audioCtx.destination);
-      src.start();src.onended=sched;
+
+    // TÉCNICA 1: Oscilador silencioso contínuo
+    // Mantém o AudioContext ativo no iOS em background
+    _bgOscillator=_audioCtx.createOscillator();
+    _bgGain=_audioCtx.createGain();
+    _bgGain.gain.value=0.00001; // volume ínfimo — inaudível
+    _bgOscillator.connect(_bgGain);
+    _bgGain.connect(_audioCtx.destination);
+    _bgOscillator.frequency.value=1; // 1Hz — sub-audível
+    _bgOscillator.start();
+
+    // TÉCNICA 2: Buffer silencioso periódico (reforço)
+    function schedSilent(){
+      if(!_audioCtx||_audioCtx.state==='closed')return;
+      try{
+        const buf=_audioCtx.createBuffer(1,_audioCtx.sampleRate*0.1,_audioCtx.sampleRate);
+        const src=_audioCtx.createBufferSource();src.buffer=buf;
+        const g2=_audioCtx.createGain();g2.gain.value=0.00001;
+        src.connect(g2);g2.connect(_audioCtx.destination);
+        src.start();
+        src.onended=()=>setTimeout(schedSilent,5000);
+      }catch(e){setTimeout(schedSilent,5000);}
     }
-    sched();log('🔊 Keep-alive ativo','i');
+    schedSilent();
+
+    log('🔊 Keep-alive 24h ativo (áudio silencioso)','i');
+  }catch(e){log('⚠ Keep-alive áudio falhou: '+e.message,'w');}
+
+  // TÉCNICA 3: Video element trick para iOS
+  // Um <video> em loop mantém a página ativa
+  try{
+    let vid=document.getElementById('_bgVid');
+    if(!vid){
+      vid=document.createElement('video');
+      vid.id='_bgVid';
+      vid.setAttribute('loop','');
+      vid.setAttribute('muted','');
+      vid.setAttribute('playsinline','');
+      vid.style.cssText='position:fixed;width:1px;height:1px;opacity:0.001;top:0;left:0;pointer-events:none;z-index:-1';
+      // Vídeo mínimo em base64 (1x1 pixel, 1 frame)
+      vid.src='data:video/mp4;base64,AAAAIGZ0eXBpc29tAAACAGlzb21pc28yYXZjMW1wNDEAAAAIZnJlZQAAAs1tZGF0AAACrgYF//+q3EXpvebZSLeWLNgg2SPu73gyNjQgLSBjb3JlIDE0MiByMjQ3OSBkZDc5YTYxIC0gSC4yNjQvTVBFRy00IEFWQyBjb2RlYyAtIENvcHlsZWZ0IDIwMDMtMjAxNCAtIGh0dHA6Ly93d3cudmlkZW9sYW4ub3JnL3gyNjQuaHRtbCAtIG9wdGlvbnM6IGNhYmFjPTEgcmVmPTMgZGVibG9jaz0xOjA6MCBhbmFseXNlPTB4MzoweDExMyBtZT1oZXggc3VibWU9NyBwc3k9MSBwc3lfcmQ9MS4wMDowLjAwIG1peGVkX3JlZj0xIG1lX3JhbmdlPTE2IGNocm9tYV9tZT0xIHRyZWxsaXM9MSA4eDhkY3Q9MSBjcW09MCBkZWFkem9uZT0yMSwxMSBmYXN0X3Bza2lwPTEgY2hyb21hX3FwX29mZnNldD0tMiB0aHJlYWRzPTEgbG9va2FoZWFkX3RocmVhZHM9MSBzbGljZWRfdGhyZWFkcz0wIG5yPTAgZGVjaW1hdGU9MSBpbnRlcmxhY2VkPTAgYmx1cmF5X2NvbXBhdD0wIGNvbnN0cmFpbmVkX2ludHJhPTAgYmZyYW1lcz0zIGJfcHlyYW1pZD0yIGJfYWRhcHQ9MSBiX2JpYXM9MCBkaXJlY3Q9MSB3ZWlnaHRiPTEgb3Blbl9nb3A9MCB3ZWlnaHRwPTIga2V5aW50PTI1MCBrZXlpbnRfbWluPTEwIHNjZW5lY3V0PTQwIGludHJhX3JlZnJlc2g9MCByY19sb29rYWhlYWQ9NDAgcmM9Y3JmIG1idHJlZT0xIGNyZj0yMy4wIHFjb21wPTAuNjAgcXBtaW49MCBxcG1heD02OSBxcHN0ZXA9NCBpcF9yYXRpbz0xLjQwIGFxPTE6MS4wMAAAAAAyZYiEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA';
+      document.body.appendChild(vid);
+    }
+    vid.play().catch(()=>{});
   }catch(e){}
 }
+
 async function reqWakeLock(){
-  try{if('wakeLock' in navigator){_wakeLock=await navigator.wakeLock.request('screen');_wakeLock.addEventListener('release',()=>setTimeout(reqWakeLock,1000));}}catch(e){}
+  try{
+    if('wakeLock' in navigator){
+      if(_wakeLock)try{await _wakeLock.release();}catch(e){}
+      _wakeLock=await navigator.wakeLock.request('screen');
+      _wakeLock.addEventListener('release',()=>{
+        // Re-request imediatamente se perdeu o lock
+        setTimeout(reqWakeLock,500);
+      });
+    }
+  }catch(e){}
 }
+
+// Heartbeat agressivo — verifica e reconecta a cada 3s
+let _heartbeatActive=false;
+function startHeartbeat(){
+  if(_heartbeatActive)return;
+  _heartbeatActive=true;
+  setInterval(async()=>{
+    // 1. Reativar AudioContext se suspenso
+    if(_audioCtx&&_audioCtx.state==='suspended'){
+      try{await _audioCtx.resume();}catch(e){}
+    }
+    // 2. Reconectar WS se caiu
+    if(!E.ws||E.ws.readyState===WebSocket.CLOSED||E.ws.readyState===WebSocket.CLOSING){
+      if(BU.running||BD.running)connectWS();
+    }
+    // 3. Re-request WakeLock se perdeu
+    if(_wakeLock===null&&(BU.running||BD.running)){
+      await reqWakeLock();
+    }
+    // 0. Atualizar status visual 24h
+    const bgEl=g('bgStatus');
+    if(bgEl){
+      const running=BU.running||BD.running;
+      bgEl.style.display=running?'flex':'none';
+      const dot=g('bgStatusDot');
+      const silence2=Date.now()-_lastTick;
+      if(dot)dot.style.background=silence2>15000?'var(--dn)':silence2>5000?'var(--gold)':'var(--up)';
+    }
+    // 4. Detectar se ficou muito tempo sem tick (iPad dormiu)
+    const silence=Date.now()-_lastTick;
+    if(silence>30000&&(BU.running||BD.running)){
+      log(`⚠ ${Math.round(silence/1000)}s sem tick — reconectando...`,'w');
+      connectWS();
+    }
+  },3000);
+}
+
 document.addEventListener('visibilitychange',async()=>{
   if(document.visibilityState==='visible'){
+    log('👁 Aba voltou ao foco — verificando conexões...','i');
+    // Reativar tudo ao voltar ao foco
+    if(_audioCtx&&_audioCtx.state==='suspended')await _audioCtx.resume().catch(()=>{});
     if(!E.ws||E.ws.readyState>1)connectWS();
     await reqWakeLock();
-    if(_audioCtx&&_audioCtx.state==='suspended')_audioCtx.resume();
+    // Video trick
+    const vid=document.getElementById('_bgVid');
+    if(vid)vid.play().catch(()=>{});
   }
 });
+
+// iOS: reativar ao toque (necessário para AudioContext após interrupção)
+document.addEventListener('touchstart',()=>{
+  if(_audioCtx&&_audioCtx.state==='suspended')_audioCtx.resume().catch(()=>{});
+  const vid=document.getElementById('_bgVid');
+  if(vid&&vid.paused)vid.play().catch(()=>{});
+},{once:false,passive:true});
 setInterval(()=>{
   if(Date.now()-_lastTick>15000&&(BU.running||BD.running)){
     log('⚠ Sem dados há '+(Math.round((Date.now()-_lastTick)/1000))+'s — reconectando...','w');
@@ -1878,7 +1980,7 @@ function startBot(s){
   const _diagDelta=gf(s==='u'?'tavU':'tavD');
   const _diagSz=gf(s==='u'?'szU':'szD');
   log(`DRBot ${s==='u'?'UP ↑':'DOWN ↓'} iniciado · ref: $${E.price.toFixed(2)} · modo: ${_diagMode} · trigger: ${m}${m==='abs'||m==='both'?' $'+_diagDelta:''} · sz: ${_diagSz} USDC`,'i');
-  startKeepalive();reqWakeLock();
+  startKeepalive();reqWakeLock();startHeartbeat();
   updLabel(s);updBridges();
 }
 function stopBot(s){
