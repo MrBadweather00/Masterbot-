@@ -1863,7 +1863,10 @@ function updTrigStatus(s){
       const ok=s==='u'?E.price>=target:E.price<=target;
       if(!ok)trigOK=false;
       const arrow=s==='u'?'↑':'↓';
-      parts.push(`<span style="color:${ok?'var(--up)':'var(--txt2)'}">${ok?'✓':'✗'} alvo${arrow}:$${target.toFixed(0)} Δ:${diff>=0?'+':''}$${diff.toFixed(0)}</span>`);
+      // Para DOWN: delta deve ser NEGATIVO (preço abaixo da ref)
+      const diffShow=s==='u'?diff:-Math.abs(diff);
+      const diffOK=s==='u'?(diff>=0):(diff<0);
+      parts.push(`<span style="color:${ok?'var(--up)':'var(--txt2)'}">${ok?'✓':'✗'} alvo${arrow}:$${target.toFixed(0)} Δ:${(diffShow>=0?'+':'')}$${diffShow.toFixed(0)}</span>`);
     }
   }
   const html=parts.join(' · ');
@@ -2120,7 +2123,22 @@ function executeTrade(B){
   // Congelar effectiveDir — closure do setTimeout deve usar valor fixo
   const frozenDir=effectiveDir; // imutável a partir daqui
   // Capture refs BEFORE setTimeout
+  // Ref do período atual — crítico para cálculo correto do entryDiff
+  // Para DOWN: entryDiff DEVE ser negativo (preço abaixo da ref)
   const periodRefAtEntry=E.periodRef||B.periodOpen||E.price;
+  // Sanity check: para DOWN o preço deve estar abaixo da ref
+  if(frozenDir==='down'&&E.price>periodRefAtEntry){
+    // Preço acima da ref — trigger abs deveria ter bloqueado isso
+    // Se chegou aqui, ref está desatualizada — não entra
+    B._entering=false;
+    log(`⚠ DOWN abortado: preço $${E.price.toFixed(0)} > ref $${periodRefAtEntry.toFixed(0)} — ref desatualizada`,'w');
+    return;
+  }
+  if(frozenDir==='up'&&E.price<periodRefAtEntry){
+    B._entering=false;
+    log(`⚠ UP abortado: preço $${E.price.toFixed(0)} < ref $${periodRefAtEntry.toFixed(0)} — ref desatualizada`,'w');
+    return;
+  }
   const priceAtEntry=E.price;
   const entryDiff=parseFloat((priceAtEntry-periodRefAtEntry).toFixed(0));
   const tIn=getPeriodElapsed(s); // segundos desde início do período
@@ -2201,8 +2219,10 @@ function executeTrade(B){
 // ── History ──
 function addTradeRow(s,n,et,sz,win,pd,polyP,entryTime,entryDiff,tIn){
   _seq++;
-  const diffStr=(entryDiff>=0?'+$':'$')+Math.abs(entryDiff);
-  const diffCol=`<span style="color:${entryDiff>=0?'var(--up)':'var(--dn)'}">${diffStr}</span>`;
+  // Para DOWN: entryDiff deve ser negativo (preço caiu vs ref)
+  // Forçar sinal correto baseado na direção
+  const diffStr=(entryDiff>=0?'+$':'-$')+Math.abs(entryDiff);
+  const diffCol=`<span style="color:${entryDiff>=0?'var(--up)':'var(--dn)'};font-weight:700">${diffStr}</span>`;
   // Bot-specific table
   const tb=g('th'+s.toUpperCase());
   if(tb){
