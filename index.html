@@ -862,13 +862,7 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
           <div class="fld-hint">UP: entra se preço atual ≥ ref + $<span id="tavULbl">10</span> · BTC precisa subir este valor desde abertura</div>
         </div>
         <!-- Delta máximo — evita entrar em mercado desequilibrado -->
-        <div class="fld" style="margin-top:6px">
-          <label style="color:var(--txt2)">⛔ Delta máximo ($) — não entrar acima</label>
-          <div class="fld-row">
-            <input type="number" id="tmaxDeltaU" value="150" min="10" step="10" placeholder="sem limite">
-            <span class="fld-unit">$</span>
-          </div>
-          <div class="fld-hint">Se BTC já subiu mais que este valor, não entra. Evita 99¢</div>
+        
         </div>
         <!-- Trig status display -->
         <div style="margin-top:6px;padding:5px 7px;background:var(--bg3);border-radius:5px;font-family:'JetBrains Mono',monospace;font-size:7px;" id="tsU"><span style="color:var(--txt3)">Aguardando dados...</span></div>
@@ -910,7 +904,7 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
         <div style="display:flex;align-items:center;gap:6px;padding:4px 2px;">
           <div class="sdot" id="dotU" style="background:var(--txt3)"></div>
           <span style="color:var(--txt3);font-family:'JetBrains Mono',monospace;font-size:7px;flex:1" id="stxtU">Parado</span>
-          <span style="color:var(--txt3);font-family:'JetBrains Mono',monospace;font-size:7px" id="tsiU">—</span>
+          <span style="font-family:'JetBrains Mono',monospace;font-size:8px;font-weight:700" id="polyPriceU">Poly: —¢</span>
         </div>
         <div style="font-family:'JetBrains Mono',monospace;font-size:7px;color:var(--gold);padding:2px;min-height:14px" id="diagU">—</div>
       </div>
@@ -1095,13 +1089,7 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
           <div class="fld-hint">DOWN: entra se preço atual ≤ ref − $<span id="tavDLbl">10</span> · BTC precisa cair este valor desde abertura</div>
         </div>
         <!-- Delta máximo -->
-        <div class="fld" style="margin-top:6px">
-          <label style="color:var(--txt2)">⛔ Delta máximo ($) — não entrar acima</label>
-          <div class="fld-row">
-            <input type="number" id="tmaxDeltaD" value="150" min="10" step="10" placeholder="sem limite">
-            <span class="fld-unit">$</span>
-          </div>
-          <div class="fld-hint">Se BTC já caiu mais que este valor, não entra. Evita 99¢</div>
+        
         </div>
         <div style="margin-top:6px;padding:5px 7px;background:var(--bg3);border-radius:5px;font-family:'JetBrains Mono',monospace;font-size:7px;" id="tsD"><span style="color:var(--txt3)">Aguardando dados...</span></div>
         <!-- Period time window -->
@@ -1140,7 +1128,7 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
         <div style="display:flex;align-items:center;gap:6px;padding:4px 2px;">
           <div class="sdot" id="dotD" style="background:var(--txt3)"></div>
           <span style="color:var(--txt3);font-family:'JetBrains Mono',monospace;font-size:7px;flex:1" id="stxtD">Parado</span>
-          <span style="color:var(--txt3);font-family:'JetBrains Mono',monospace;font-size:7px" id="tsiD">—</span>
+          <span style="font-family:'JetBrains Mono',monospace;font-size:8px;font-weight:700" id="polyPriceD">Poly: —¢</span>
         </div>
         <div style="font-family:'JetBrains Mono',monospace;font-size:7px;color:var(--gold);padding:2px;min-height:14px" id="diagD">—</div>
       </div>
@@ -1367,6 +1355,130 @@ setInterval(()=>{
   }
 },10000);
 
+
+
+// ════════════════════════════════════════════════════════
+// POLYMARKET API — Leitura pública de preços reais
+// ════════════════════════════════════════════════════════
+const P={
+  upPrice:null,    // preço atual do outcome UP (0..1)
+  dnPrice:null,    // preço atual do outcome DOWN (0..1)
+  upTokenId:null,  // token ID do outcome UP
+  dnTokenId:null,  // token ID do outcome DOWN
+  marketSlug:null, // slug do mercado atual
+  marketEnd:null,  // timestamp de fechamento
+  lastFetch:0,     // último fetch bem-sucedido
+  fetching:false,  // evitar fetch paralelo
+  error:null       // último erro
+};
+
+// Buscar mercado BTC 5min atual e preços
+async function fetchPolyPrices(){
+  if(P.fetching)return;
+  P.fetching=true;
+  try{
+    // 1. Buscar mercados BTC ativos (5 minutos)
+    const tfLabel=gv('tfU')||gv('tfD')||'5m';
+    const tfMinutes={'5m':'5 minutes','15m':'15 minutes','1h':'1 hour'}[tfLabel]||'5 minutes';
+    const sym=E.lbl||'BTC';
+    const searchUrl=`https://gamma-api.polymarket.com/markets?active=true&closed=false&limit=20&q=${encodeURIComponent(sym)}`;
+    const r1=await fetch(searchUrl);
+    if(!r1.ok)throw new Error('gamma API '+r1.status);
+    const markets=await r1.json();
+    
+    // Filtrar pelo mercado de 5min mais próximo
+    const now=Date.now();
+    const btcMarkets=markets.filter(m=>{
+      const q=(m.question||m.title||'').toLowerCase();
+      return q.includes(sym.toLowerCase())&&(q.includes('5 min')||q.includes('5min'));
+    });
+    
+    if(!btcMarkets.length){
+      P.error='Nenhum mercado BTC 5min ativo';
+      P.fetching=false;
+      updPolyDisplay();
+      return;
+    }
+    
+    // Pegar o mercado que fecha mais próximo do futuro
+    const market=btcMarkets.sort((a,b)=>{
+      const ea=new Date(a.endDate||a.end_date||0).getTime();
+      const eb=new Date(b.endDate||b.end_date||0).getTime();
+      const da=Math.abs(ea-now),db=Math.abs(eb-now);
+      return da-db;
+    })[0];
+    
+    P.marketSlug=market.slug||market.conditionId;
+    P.marketEnd=new Date(market.endDate||market.end_date||0).getTime();
+    P.error=null;
+    
+    // 2. Extrair token IDs
+    const tokens=market.tokens||market.outcomes||[];
+    for(const t of tokens){
+      const name=(t.outcome||t.title||t.name||'').toUpperCase();
+      if(name.includes('UP')||name.includes('CIMA')||name.includes('YES')||name==='YES'){
+        P.upTokenId=t.token_id||t.tokenId||t.id;
+      }else if(name.includes('DOWN')||name.includes('BAIXO')||name.includes('NO')||name==='NO'){
+        P.dnTokenId=t.token_id||t.tokenId||t.id;
+      }
+    }
+    
+    // 3. Buscar preços via CLOB midpoint
+    if(P.upTokenId){
+      try{
+        const r2=await fetch(`https://clob.polymarket.com/midpoint?token_id=${P.upTokenId}`);
+        if(r2.ok){const d=await r2.json();P.upPrice=parseFloat(d.mid)||null;}
+      }catch(e){}
+    }
+    if(P.dnTokenId){
+      try{
+        const r3=await fetch(`https://clob.polymarket.com/midpoint?token_id=${P.dnTokenId}`);
+        if(r3.ok){const d=await r3.json();P.dnPrice=parseFloat(d.mid)||null;}
+      }catch(e){}
+    }
+    
+    // Se temos upPrice mas não dnPrice, calcular
+    if(P.upPrice&&!P.dnPrice)P.dnPrice=parseFloat((1-P.upPrice).toFixed(4));
+    if(P.dnPrice&&!P.upPrice)P.upPrice=parseFloat((1-P.dnPrice).toFixed(4));
+    
+    P.lastFetch=Date.now();
+    log(`📡 Polymarket: UP ${P.upPrice?Math.round(P.upPrice*100)+'¢':'—'} · DN ${P.dnPrice?Math.round(P.dnPrice*100)+'¢':'—'} · ${market.question||market.title||''}`.slice(0,120),'i');
+    
+  }catch(e){
+    P.error=e.message;
+  }
+  P.fetching=false;
+  updPolyDisplay();
+}
+
+// Atualizar display do preço Polymarket
+function updPolyDisplay(){
+  // Atualizar badge nos botões start e no diag
+  ['u','d'].forEach(s=>{
+    const price=s==='u'?P.upPrice:P.dnPrice;
+    const diagEl=g('polyPrice'+s.toUpperCase()||'polyP'+s.toUpperCase());
+    if(!diagEl)return;
+    if(price===null){
+      diagEl.textContent='Poly: —¢';
+      diagEl.style.color='var(--txt3)';
+    } else {
+      const cents=Math.round(price*100);
+      const mn=gf(s==='u'?'tminU':'tminD');
+      const mx=gf(s==='u'?'tmaxU':'tmaxD');
+      const inRange=!isNaN(mn)&&!isNaN(mx)&&price>=mn&&price<=mx;
+      diagEl.textContent=`Poly: ${cents}¢`;
+      diagEl.style.color=inRange?'var(--up)':'var(--dn)';
+    }
+  });
+}
+
+// Fetch a cada 10s (Polymarket atualiza a cada bloco ~15s)
+setInterval(()=>{
+  // Só busca se próximo ao início de um período ou se não tem preço
+  if(!P.upPrice||Date.now()-P.lastFetch>10000)fetchPolyPrices();
+},10000);
+// Fetch inicial
+setTimeout(fetchPolyPrices,2000);
 
 // ── Kline Open (referência do período) ──
 async function fetchKlineOpen(sym,tf,pStartMs){
@@ -1669,6 +1781,27 @@ function checkTrigger(s){
   if(!ref)return false;
   const diff=E.price-ref;
   const diffPct=ref>0?(diff/ref*100):0;
+
+  // ── GATE: preço real da Polymarket deve estar no range mn-mx ──
+  const mn=gf(s==='u'?'tminU':'tminD');
+  const mx=gf(s==='u'?'tmaxU':'tmaxD');
+  if(!isNaN(mn)&&!isNaN(mx)&&mn>0&&mx>0){
+    // Preço real da API (preferido) ou estimativa via delta
+    const realPrice=s==='u'?P.upPrice:P.dnPrice;
+    const deltaPct=(E.price-ref)/ref;
+    const estPrice=realPrice!==null?realPrice:Math.max(0.01,Math.min(0.99,0.5+deltaPct*450));
+    if(estPrice<mn||estPrice>mx){
+      const diagEl=g('diag'+s.toUpperCase());
+      if(diagEl&&B.running&&!B.inTrade){
+        const src=realPrice!==null?'real':'est';
+        const cents=Math.round(estPrice*100);
+        const mnC=Math.round(mn*100),mxC=Math.round(mx*100);
+        diagEl.innerHTML=`<span style="color:var(--dn)">⛔ ${s==='u'?'UP':'DOWN'} ${cents}¢[${src}] fora do range ${mnC}–${mxC}¢</span>`;
+      }
+      return false;
+    }
+  }
+
   // Iniciar como false — só ficam true se explicitamente verificados
   let pOk=false,aOk=false;
   if(m==='pct'||m==='both'){
@@ -1681,12 +1814,6 @@ function checkTrigger(s){
     if(isNaN(delta)||delta<=0)return false;
     const target=s==='u'?ref+delta:ref-delta;
     aOk=s==='u'?E.price>=target:E.price<=target;
-    // Verificar delta máximo — não entrar em mercado com desequilíbrio extremo
-    const maxDelta=gf(s==='u'?'tmaxDeltaU':'tmaxDeltaD');
-    if(!isNaN(maxDelta)&&maxDelta>0){
-      const absDiff=Math.abs(E.price-ref);
-      if(absDiff>maxDelta)return false; // delta real > máximo configurado
-    }
   }
   if(m==='pct')return pOk;
   if(m==='abs')return aOk;
@@ -1910,8 +2037,13 @@ function executeTrade(B){
   // Usa módulo do timestamp para variar a cada entrada
   // polyP: pseudo-aleatório baseado em rounds+ms, sempre dentro de mn..mx
   // polyP: combina rounds, timestamp e random para máxima variação dentro do range
-  const _seed=((B.rounds*7919)+(Date.now()%10000)+Math.floor(Math.random()*1000))%1000;
-  const polyP=Math.max(mn,Math.min(mx,parseFloat((mn+(_seed/1000)*(mx-mn)).toFixed(2))));
+  // PolyP: preço real Polymarket se disponível, senão estimativa
+  const _realP=s==='u'?P.upPrice:P.dnPrice;
+  const _deltaPct=(E.price-(E.periodRef||B.periodOpen||E.price))/(E.periodRef||B.periodOpen||E.price);
+  const _estP=Math.max(0.01,Math.min(0.99,0.5+_deltaPct*450));
+  const _rawP=_realP!==null?_realP:_estP;
+  const polyP=parseFloat(Math.max(mn,Math.min(mx,_rawP)).toFixed(2));
+  const polySource=_realP!==null?'REAL':'EST';
   const actualDir=effectiveDir==='up'?'UP':'DOWN';
   const et=strong?(effectiveDir==='up'?'⚡↑':'⚡↓'):'';
   const tag=apiConfigured()?'[REAL]':'[SIM]';
@@ -1921,7 +2053,7 @@ function executeTrade(B){
   _gLock=true;B.inTrade=true;B._entering=false;B.rounds++;
   const secsLeft=Math.round(dur/1000);
   const ml=Math.floor(secsLeft/60),sl2=String(secsLeft%60).padStart(2,'0');
-  log(`${tag} ${actualDir} #${B.rounds} ${et} ENTRADA ${Math.round(polyP*100)}¢ @${entryTime} · Δ${entryDiff>=0?'+':''}$${entryDiff} · fecha em ${ml}:${sl2}`,'w');
+  log(`${tag} ${actualDir} #${B.rounds} ${et} ENTRADA ${Math.round(polyP*100)}¢[${polySource}] @${entryTime} · Δ${entryDiff>=0?'+':''}$${entryDiff} · fecha em ${ml}:${sl2}`,'w');
   updLabel(s);updBridges();updTrigStatus(s);
   const diagEl=g('diag'+s.toUpperCase());
   if(diagEl)diagEl.innerHTML=`<span style="color:var(--up)">✓ EM TRADE — aguardando fechamento ${ml}:${sl2}...</span>`;
@@ -2365,7 +2497,7 @@ const CFG_IDS=['tfU','tfD','modeU','modeD','tminU','tminD','tmaxU','tmaxD','slip
   'slNU','slND','stU','stD','tpEnU','tpEnD','tpU','tpD','mlU','mlD','twU','twD',
   'twsU','tweU','twsD','tweD','upThresh','dnThresh','momWin',
   'ptMinU','ptSecU','ptMinEndU','ptSecEndU','ptMinD','ptSecD','ptMinEndD','ptSecEndD',
-  'tmaxDeltaU','tmaxDeltaD'];
+  ];
 function setupAutoSave(){
   CFG_IDS.forEach(id=>{const el=g(id);if(el){el.addEventListener('change',saveConfig);el.addEventListener('input',saveConfig);}});
 }
