@@ -861,6 +861,15 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
           </div>
           <div class="fld-hint">UP: entra se preço atual ≥ ref + $<span id="tavULbl">10</span> · BTC precisa subir este valor desde abertura</div>
         </div>
+        <!-- Delta máximo — evita entrar em mercado desequilibrado -->
+        <div class="fld" style="margin-top:6px">
+          <label style="color:var(--txt2)">⛔ Delta máximo ($) — não entrar acima</label>
+          <div class="fld-row">
+            <input type="number" id="tmaxDeltaU" value="150" min="10" step="10" placeholder="sem limite">
+            <span class="fld-unit">$</span>
+          </div>
+          <div class="fld-hint">Se BTC já subiu mais que este valor, não entra. Evita 99¢</div>
+        </div>
         <!-- Trig status display -->
         <div style="margin-top:6px;padding:5px 7px;background:var(--bg3);border-radius:5px;font-family:'JetBrains Mono',monospace;font-size:7px;" id="tsU"><span style="color:var(--txt3)">Aguardando dados...</span></div>
         <!-- Period time window -->
@@ -1085,6 +1094,15 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
           </div>
           <div class="fld-hint">DOWN: entra se preço atual ≤ ref − $<span id="tavDLbl">10</span> · BTC precisa cair este valor desde abertura</div>
         </div>
+        <!-- Delta máximo -->
+        <div class="fld" style="margin-top:6px">
+          <label style="color:var(--txt2)">⛔ Delta máximo ($) — não entrar acima</label>
+          <div class="fld-row">
+            <input type="number" id="tmaxDeltaD" value="150" min="10" step="10" placeholder="sem limite">
+            <span class="fld-unit">$</span>
+          </div>
+          <div class="fld-hint">Se BTC já caiu mais que este valor, não entra. Evita 99¢</div>
+        </div>
         <div style="margin-top:6px;padding:5px 7px;background:var(--bg3);border-radius:5px;font-family:'JetBrains Mono',monospace;font-size:7px;" id="tsD"><span style="color:var(--txt3)">Aguardando dados...</span></div>
         <!-- Period time window -->
         <div style="margin-top:8px;padding:8px;background:var(--bg3);border-radius:7px;border:1px solid var(--b1);">
@@ -1282,8 +1300,8 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
 
 // ── State ──
 const E={sym:'BTCUSDT',lbl:'BTC',price:null,prev:null,open:null,high:null,low:null,ticks:0,hist:[],ws:null,range:30,signal:'neutral',momentum:0,periodRef:null,periodRefStart:null,_dayKey:null,displayPrice:null,displayPrev:null};
-const BU={dir:'u',running:false,rounds:0,wins:0,losses:0,pnl:0,consec:0,_last:null,pnlHist:[0],inTrade:false,periodOpen:null,periodStart:null};
-const BD={dir:'d',running:false,rounds:0,wins:0,losses:0,pnl:0,consec:0,_last:null,pnlHist:[0],inTrade:false,periodOpen:null,periodStart:null};
+const BU={dir:'u',running:false,rounds:0,wins:0,losses:0,pnl:0,consec:0,_last:null,pnlHist:[0],inTrade:false,_entering:false,periodOpen:null,periodStart:null};
+const BD={dir:'d',running:false,rounds:0,wins:0,losses:0,pnl:0,consec:0,_last:null,pnlHist:[0],inTrade:false,_entering:false,periodOpen:null,periodStart:null};
 const TM={u:'abs',d:'abs'}; // default: Valor Absoluto
 let _gLock=false; // global trade lock
 function _checkLock(){_gLock=BU.inTrade||BD.inTrade;} // sincroniza lock com estado real
@@ -1663,6 +1681,12 @@ function checkTrigger(s){
     if(isNaN(delta)||delta<=0)return false;
     const target=s==='u'?ref+delta:ref-delta;
     aOk=s==='u'?E.price>=target:E.price<=target;
+    // Verificar delta máximo — não entrar em mercado com desequilíbrio extremo
+    const maxDelta=gf(s==='u'?'tmaxDeltaU':'tmaxDeltaD');
+    if(!isNaN(maxDelta)&&maxDelta>0){
+      const absDiff=Math.abs(E.price-ref);
+      if(absDiff>maxDelta)return false; // delta real > máximo configurado
+    }
   }
   if(m==='pct')return pOk;
   if(m==='abs')return aOk;
@@ -1742,7 +1766,7 @@ function stopBot(s){
 }
 function resetBot(s){
   const B=s==='u'?BU:BD;
-  Object.assign(B,{running:false,rounds:0,wins:0,losses:0,pnl:0,consec:0,_last:null,pnlHist:[0],inTrade:false,periodOpen:null,periodStart:null});
+  Object.assign(B,{running:false,rounds:0,wins:0,losses:0,pnl:0,consec:0,_last:null,pnlHist:[0],inTrade:false,_entering:false,periodOpen:null,periodStart:null});
   if(!BU.inTrade&&!BD.inTrade)_gLock=false;
   const tb=g('th'+s.toUpperCase());if(tb)tb.innerHTML='';
   drawPnlChart(s);updLabel(s);updOV(s);saveHistory();
@@ -1805,23 +1829,25 @@ setInterval(updatePeriodStatus,1000);
 // ── TRADE ENGINE ──
 function executeTrade(B){
   const s=B.dir;
-  _checkLock(); // garante que lock reflete estado real
-  if(!E.price||B.inTrade||_gLock)return;
+  // Proteção atômica contra dupla entrada (race condition entre ticks)
+  if(B._entering||B.inTrade)return;
+  B._entering=true;
+  _checkLock();
+  if(!E.price||_gLock){B._entering=false;return;}
   const dl=Math.max(5,gi(s==='u'?'dlU':'dlD')||5)*1000;
-  if(B._last&&Date.now()-B._last<dl)return;
+  if(B._last&&Date.now()-B._last<dl){B._entering=false;return;}
   if(!inTimeWindow(s)){
     const d=g('diag'+s.toUpperCase());
     if(d&&B.running)d.innerHTML='<span style="color:var(--txt3)">⏸ Fora da janela de horário</span>';
-    return;
+    B._entering=false;return;
   }
   if(!isPeriodTimeOK(s)){
     const d=g('diag'+s.toUpperCase());
     if(d&&B.running)d.innerHTML='<span style="color:var(--txt3)">⏱ Aguardando janela do período</span>';
-    return;
+    B._entering=false;return;
   }
   if(!checkTrigger(s)){
-    // updTrigStatus já mostra o status — não precisa logar aqui
-    return;
+    B._entering=false;return;
   }
 
   const mn=gf(s==='u'?'tminU':'tminD');
@@ -1837,12 +1863,12 @@ function executeTrade(B){
   const m=TM[s];
 
   // Validar parâmetros obrigatórios — qualquer inválido aborta silenciosamente
-  if(isNaN(mn)||mn<0.1||mn>0.99)return;
-  if(isNaN(mx)||mx<0.1||mx>0.99||mx<mn)return;
-  if(isNaN(sz)||sz<=0)return;
-  if(!m)return;
+  if(isNaN(mn)||mn<0.1||mn>0.99){B._entering=false;return;}
+  if(isNaN(mx)||mx<0.1||mx>0.99||mx<mn){B._entering=false;return;}
+  if(isNaN(sz)||sz<=0){B._entering=false;return;}
+  if(!m){B._entering=false;return;}
 
-  if(B.rounds>=mr){log(`DRBot ${s==='u'?'UP':'DOWN'}: ${mr} rounds completos.`,'w');stopBot(s);return;}
+  if(B.rounds>=mr){log(`DRBot ${s==='u'?'UP':'DOWN'}: ${mr} rounds completos.`,'w');stopBot(s);B._entering=false;return;}
 
   // Direction logic
   const isUp=sig==='sup'||sig==='wup',isDn=sig==='sdn'||sig==='wdn';
@@ -1851,16 +1877,16 @@ function executeTrade(B){
   if(mode==='auto'){
     if(sig==='sup'||sig==='wup')effectiveDir='up';
     else if(sig==='sdn'||sig==='wdn')effectiveDir='down';
-    else return; // AUTO needs a signal
+    else{B._entering=false;return;} // AUTO needs a signal
   } else {
     // Fixed mode — edge can only block if "Só FORTE" is on AND trigger is % (not $)
     if(m!=='abs'){
-      if(effectiveDir==='up'&&isDn)return;
-      if(effectiveDir==='down'&&isUp)return;
+      if(effectiveDir==='up'&&isDn){B._entering=false;return;}
+      if(effectiveDir==='down'&&isUp){B._entering=false;return;}
     }
   }
   // "Só sinal FORTE" — only applies to % mode
-  if(strongOnly&&m!=='abs'&&!strong)return;
+  if(strongOnly&&m!=='abs'&&!strong){B._entering=false;return;}
 
   // Congelar effectiveDir — closure do setTimeout deve usar valor fixo
   const frozenDir=effectiveDir; // imutável a partir daqui
@@ -1878,7 +1904,7 @@ function executeTrade(B){
   const dur=periodEnd-Date.now();
   // Bloquear apenas se restar menos de 5s — evita setTimeout no período errado
   // A janela de tempo customizável (ptMinEnd) já controla quando parar
-  if(dur<5000)return;
+  if(dur<5000){B._entering=false;return;}
 
   // PolyP: valor variável dentro do range (simulação realista)
   // Usa módulo do timestamp para variar a cada entrada
@@ -1891,8 +1917,8 @@ function executeTrade(B){
   const tag=apiConfigured()?'[REAL]':'[SIM]';
   const entryTime=now();
 
-  // ENTER — lock
-  _gLock=true;B.inTrade=true;B.rounds++;
+  // ENTER — lock definitivo
+  _gLock=true;B.inTrade=true;B._entering=false;B.rounds++;
   const secsLeft=Math.round(dur/1000);
   const ml=Math.floor(secsLeft/60),sl2=String(secsLeft%60).padStart(2,'0');
   log(`${tag} ${actualDir} #${B.rounds} ${et} ENTRADA ${Math.round(polyP*100)}¢ @${entryTime} · Δ${entryDiff>=0?'+':''}$${entryDiff} · fecha em ${ml}:${sl2}`,'w');
@@ -2338,7 +2364,8 @@ const CFG_IDS=['tfU','tfD','modeU','modeD','tminU','tminD','tmaxU','tmaxD','slip
   'tpvU','tpvD','tpwU','tpwD','tavU','tavD','szU','szD','rnU','rnD','dlU','dlD',
   'slNU','slND','stU','stD','tpEnU','tpEnD','tpU','tpD','mlU','mlD','twU','twD',
   'twsU','tweU','twsD','tweD','upThresh','dnThresh','momWin',
-  'ptMinU','ptSecU','ptMinEndU','ptSecEndU','ptMinD','ptSecD','ptMinEndD','ptSecEndD'];
+  'ptMinU','ptSecU','ptMinEndU','ptSecEndU','ptMinD','ptSecD','ptMinEndD','ptSecEndD',
+  'tmaxDeltaU','tmaxDeltaD'];
 function setupAutoSave(){
   CFG_IDS.forEach(id=>{const el=g(id);if(el){el.addEventListener('change',saveConfig);el.addEventListener('input',saveConfig);}});
 }
