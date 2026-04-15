@@ -663,9 +663,20 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
         <!-- UP and DOWN status inline -->
         <!-- Delta line -->
         <div style="font-family:'JetBrains Mono',monospace;font-size:8px;margin-bottom:5px;display:flex;gap:8px;flex-wrap:wrap;" id="clockDelta"><span style="color:var(--txt3)">Aguardando ref...</span></div>
-        <div style="display:flex;gap:6px;">
+        <div style="display:flex;gap:6px;margin-bottom:6px;">
           <div style="font-family:'JetBrains Mono',monospace;font-size:7px;padding:2px 6px;border-radius:4px;background:var(--up3);color:var(--up);" id="clockStU">UP: parado</div>
           <div style="font-family:'JetBrains Mono',monospace;font-size:7px;padding:2px 6px;border-radius:4px;background:var(--dn3);color:var(--dn);" id="clockStD">DN: parado</div>
+        </div>
+        <!-- Botões Buy UP / Buy DOWN estilo Polymarket -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;">
+          <div style="background:rgba(0,229,160,.15);border:1px solid var(--up);border-radius:7px;padding:5px 8px;text-align:center;cursor:default;">
+            <div style="font-family:'JetBrains Mono',monospace;font-size:7px;color:var(--up);margin-bottom:2px;">BUY UP ↑</div>
+            <div style="font-family:'Bebas Neue',sans-serif;font-size:16px;color:var(--up);line-height:1" id="polyBuyUp">—¢</div>
+          </div>
+          <div style="background:rgba(255,59,92,.15);border:1px solid var(--dn);border-radius:7px;padding:5px 8px;text-align:center;cursor:default;">
+            <div style="font-family:'JetBrains Mono',monospace;font-size:7px;color:var(--dn);margin-bottom:2px;">BUY DOWN ↓</div>
+            <div style="font-family:'Bebas Neue',sans-serif;font-size:16px;color:var(--dn);line-height:1" id="polyBuyDn">—¢</div>
+          </div>
         </div>
       </div>
     </div>
@@ -1555,10 +1566,10 @@ async function fetchPolyPrices(){
 
 // Atualizar display do preço Polymarket
 function updPolyDisplay(){
-  // Atualizar badge nos botões start e no diag
+  // Atualizar badge nos botões start
   ['u','d'].forEach(s=>{
     const price=s==='u'?P.upPrice:P.dnPrice;
-    const diagEl=g('polyPrice'+s.toUpperCase()||'polyP'+s.toUpperCase());
+    const diagEl=g('polyPrice'+s.toUpperCase());
     if(!diagEl)return;
     if(price===null){
       diagEl.textContent='Poly: —¢';
@@ -1572,6 +1583,59 @@ function updPolyDisplay(){
       diagEl.style.color=inRange?'var(--up)':'var(--dn)';
     }
   });
+
+  // Atualizar botões BUY UP / BUY DOWN no relógio
+  const ref=E.periodRef;
+  const buyUp=g('polyBuyUp');
+  const buyDn=g('polyBuyDn');
+
+  // Preço UP
+  const upPrice=P.upPrice;
+  if(buyUp){
+    if(upPrice!==null){
+      const cents=Math.round(upPrice*100);
+      const mn=gf('tminU'),mx=gf('tmaxU');
+      const inRange=!isNaN(mn)&&!isNaN(mx)&&upPrice>=mn&&upPrice<=mx;
+      buyUp.textContent=cents+'¢';
+      buyUp.style.color=inRange?'var(--up)':'var(--txt3)';
+      buyUp.parentElement.style.opacity=inRange?'1':'0.4';
+    } else {
+      // Sem API: calcular estimativa
+      if(ref&&E.price){
+        const dp=(E.price-ref)/ref;
+        const est=Math.max(0.01,Math.min(0.99,0.5+dp*450));
+        buyUp.textContent=Math.round(est*100)+'¢*';
+        const mn=gf('tminU'),mx=gf('tmaxU');
+        const inRange=!isNaN(mn)&&!isNaN(mx)&&est>=mn&&est<=mx;
+        buyUp.style.color=inRange?'var(--up)':'var(--txt3)';
+        buyUp.parentElement.style.opacity=inRange?'1':'0.4';
+      } else {buyUp.textContent='—¢';}
+    }
+  }
+
+  // Preço DOWN
+  const dnPrice=P.dnPrice;
+  if(buyDn){
+    if(dnPrice!==null){
+      const cents=Math.round(dnPrice*100);
+      const mn=gf('tminD'),mx=gf('tmaxD');
+      const inRange=!isNaN(mn)&&!isNaN(mx)&&dnPrice>=mn&&dnPrice<=mx;
+      buyDn.textContent=cents+'¢';
+      buyDn.style.color=inRange?'var(--dn)':'var(--txt3)';
+      buyDn.parentElement.style.opacity=inRange?'1':'0.4';
+    } else {
+      if(ref&&E.price){
+        const dp=(E.price-ref)/ref;
+        const estUp=Math.max(0.01,Math.min(0.99,0.5+dp*450));
+        const est=1-estUp; // preço DOWN = 1 - preço UP
+        buyDn.textContent=Math.round(est*100)+'¢*';
+        const mn=gf('tminD'),mx=gf('tmaxD');
+        const inRange=!isNaN(mn)&&!isNaN(mx)&&est>=mn&&est<=mx;
+        buyDn.style.color=inRange?'var(--dn)':'var(--txt3)';
+        buyDn.parentElement.style.opacity=inRange?'1':'0.4';
+      } else {buyDn.textContent='—¢';}
+    }
+  }
 }
 
 // Fetch a cada 10s (Polymarket atualiza a cada bloco ~15s)
@@ -1707,7 +1771,8 @@ function updDelta(){
   const refDelta=g('refDeltaDisplay');
   const ref=E.periodRef;
   if(!ref||!E.price){
-    if(deltaEl)deltaEl.innerHTML='<span style="color:var(--txt3)">Aguardando ref...</span>';
+    updPolyDisplay();
+  if(deltaEl)deltaEl.innerHTML='<span style="color:var(--txt3)">Aguardando ref...</span>';
     if(refDisp)refDisp.textContent='—';
     if(refDelta)refDelta.textContent='—';
     return;
@@ -1719,6 +1784,7 @@ function updDelta(){
   const arrow=d>=0?'▲':'▼';
   const sign=d>=0?'+':'';
   // Relógio delta
+  updPolyDisplay();
   if(deltaEl)deltaEl.innerHTML=`<span style="color:var(--txt3);font-size:7px">Δ período (ref $${ref.toFixed(2)}): </span><span style="color:${col};font-weight:700;font-size:12px">${arrow} ${sign}$${d.toFixed(2)}</span>`;
   // Hero display — preço a ser batido
   if(refDisp)refDisp.textContent='$'+ref.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
@@ -1891,10 +1957,13 @@ function checkTrigger(s){
   const mn=gf(s==='u'?'tminU':'tminD');
   const mx=gf(s==='u'?'tmaxU':'tmaxD');
   if(!isNaN(mn)&&!isNaN(mx)&&mn>0&&mx>0){
-    // Preço real da API (preferido) ou estimativa via delta
+    // Preço real da API (preferido) ou estimativa via delta do período
     const realPrice=s==='u'?P.upPrice:P.dnPrice;
     const deltaPct=(E.price-ref)/ref;
-    const estPrice=realPrice!==null?realPrice:Math.max(0.01,Math.min(0.99,0.5+deltaPct*450));
+    // estUpPrice = probabilidade de UP baseada na variação do BTC
+    const estUpPrice=Math.max(0.01,Math.min(0.99,0.5+deltaPct*450));
+    // Para DOWN: usar preço do outcome DOWN = 1 - upPrice
+    const estPrice=realPrice!==null?realPrice:(s==='u'?estUpPrice:1-estUpPrice);
     if(estPrice<mn||estPrice>mx){
       const diagEl=g('diag'+s.toUpperCase());
       if(diagEl&&B.running&&!B.inTrade){
@@ -2126,19 +2195,7 @@ function executeTrade(B){
   // Ref do período atual — crítico para cálculo correto do entryDiff
   // Para DOWN: entryDiff DEVE ser negativo (preço abaixo da ref)
   const periodRefAtEntry=E.periodRef||B.periodOpen||E.price;
-  // Sanity check: para DOWN o preço deve estar abaixo da ref
-  if(frozenDir==='down'&&E.price>periodRefAtEntry){
-    // Preço acima da ref — trigger abs deveria ter bloqueado isso
-    // Se chegou aqui, ref está desatualizada — não entra
-    B._entering=false;
-    log(`⚠ DOWN abortado: preço $${E.price.toFixed(0)} > ref $${periodRefAtEntry.toFixed(0)} — ref desatualizada`,'w');
-    return;
-  }
-  if(frozenDir==='up'&&E.price<periodRefAtEntry){
-    B._entering=false;
-    log(`⚠ UP abortado: preço $${E.price.toFixed(0)} < ref $${periodRefAtEntry.toFixed(0)} — ref desatualizada`,'w');
-    return;
-  }
+  // trigger abs já garantiu condição de preço vs ref
   const priceAtEntry=E.price;
   const entryDiff=parseFloat((priceAtEntry-periodRefAtEntry).toFixed(0));
   const tIn=getPeriodElapsed(s); // segundos desde início do período
@@ -2157,10 +2214,13 @@ function executeTrade(B){
   // Usa módulo do timestamp para variar a cada entrada
   // polyP: pseudo-aleatório baseado em rounds+ms, sempre dentro de mn..mx
   // polyP: combina rounds, timestamp e random para máxima variação dentro do range
-  // PolyP: preço real Polymarket se disponível, senão estimativa
+  // PolyP: preço real Polymarket se disponível, senão estimativa do outcome correto
   const _realP=s==='u'?P.upPrice:P.dnPrice;
-  const _deltaPct=(E.price-(E.periodRef||B.periodOpen||E.price))/(E.periodRef||B.periodOpen||E.price);
-  const _estP=Math.max(0.01,Math.min(0.99,0.5+_deltaPct*450));
+  const _refP=E.periodRef||B.periodOpen||E.price;
+  const _deltaPct=(E.price-_refP)/_refP;
+  const _estUpP=Math.max(0.01,Math.min(0.99,0.5+_deltaPct*450));
+  // Para DOWN: usar preço do outcome DOWN
+  const _estP=s==='u'?_estUpP:1-_estUpP;
   const _rawP=_realP!==null?_realP:_estP;
   const polyP=parseFloat(Math.max(mn,Math.min(mx,_rawP)).toFixed(2));
   const polySource=_realP!==null?'REAL':'EST';
