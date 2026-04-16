@@ -825,7 +825,8 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
             <div class="api-card-title">🔐 CREDENCIAIS — Magic Wallet (Email)</div>
             <div class="fld" style="margin-bottom:6px">
               <label>Private Key <span style="color:var(--txt3);font-size:7px">(reveal.magic.link/polymarket)</span></label>
-              <input type="password" id="apiPrivKey" placeholder="0x... (64 caracteres hex)" autocomplete="off">
+              <input type="password" id="apiPrivKey" placeholder="0x... (64 caracteres hex)" autocomplete="off" oninput="validatePrivKey(this)">
+              <div id="privKeyHint" style="font-family:'JetBrains Mono',monospace;font-size:7px;margin-top:3px;display:none"></div>
             </div>
             <div class="fld" style="margin-bottom:6px">
               <label>Funder Address <span style="color:var(--txt3);font-size:7px">(endereço do seu perfil)</span></label>
@@ -1689,8 +1690,16 @@ let _polyApiCreds=null; // {apiKey, secret, passphrase} — geradas da private k
 // Derivar credenciais L2 da Private Key (L1 auth via EIP-712)
 async function polyDeriveCredentials(){
   try{
-    const pk=gv('apiPrivKey');
-    if(!pk||!pk.startsWith('0x'))throw new Error('Private Key inválida');
+    let pk=(gv('apiPrivKey')||'').trim().replace(/\s+/g,'');
+    if(!pk)throw new Error('Private Key não preenchida');
+    // Normalizar: remover 0x se presente, depois adicionar
+    if(pk.startsWith('0x')||pk.startsWith('0X'))pk=pk.slice(2);
+    // Verificar se é hex válido de 64 caracteres
+    if(!/^[0-9a-fA-F]{64}$/.test(pk)){
+      log(`❌ Private Key inválida: ${pk.length} chars, esperado 64 hex. Verifique se copiou corretamente.`,'e');
+      throw new Error('Formato inválido: '+pk.length+' chars hex (esperado 64)');
+    }
+    pk='0x'+pk; // garantir prefixo 0x
     const wallet=new ethers.Wallet(pk);
 
     // 1. Pegar timestamp do servidor CLOB
@@ -2328,7 +2337,14 @@ function inTimeWindow(s){
 setInterval(()=>{if(BU.running)inTimeWindow('u');if(BD.running)inTimeWindow('d');},10000);
 
 // ── API ──
-function apiConfigured(){const pk=gv('apiPrivKey')||'';const fu=gv('apiFunder')||'';return pk.startsWith('0x')&&pk.length>=64&&fu.startsWith('0x')&&fu.length>=40;}
+function apiConfigured(){
+  let pk=(gv('apiPrivKey')||'').trim();
+  let fu=(gv('apiFunder')||'').trim();
+  if(pk.startsWith('0x')||pk.startsWith('0X'))pk=pk.slice(2);
+  const pkOk=/^[0-9a-fA-F]{64}$/.test(pk);
+  const fuOk=fu.startsWith('0x')&&fu.length>=40;
+  return pkOk&&fuOk;
+}
 function updAPI(){
   const ok=apiConfigured();
   ['apiDot','apiDot2'].forEach(id=>{const el=g(id);if(el)el.className='api-dot'+(ok?' ok':'');});
@@ -2343,6 +2359,23 @@ function updAPI(){
 
 // Atualizar saldo a cada 30s quando API configurada
 setInterval(()=>{if(apiConfigured()&&_polyApiCreds)checkPolyBalance();},30000);
+function validatePrivKey(el){
+  let v=el.value.trim().replace(/\s+/g,'');
+  if(!v){g('privKeyHint').style.display='none';return;}
+  if(v.startsWith('0x')||v.startsWith('0X'))v=v.slice(2);
+  const hint=g('privKeyHint');
+  hint.style.display='block';
+  if(/^[0-9a-fA-F]{64}$/.test(v)){
+    hint.textContent='✓ Formato válido ('+v.length+' chars hex)';
+    hint.style.color='var(--up)';
+  } else if(/^[0-9a-fA-F]+$/.test(v)){
+    hint.textContent='✗ '+v.length+' chars hex — esperado 64';
+    hint.style.color='var(--dn)';
+  } else {
+    hint.textContent='✗ Contém caracteres inválidos';
+    hint.style.color='var(--dn)';
+  }
+}
 ['apiPrivKey','apiFunder'].forEach(id=>{const el=g(id);if(el)el.addEventListener('input',()=>{updAPI();saveConfig();if(apiConfigured())setTimeout(checkPolyBalance,500);});});
 
 // ── Bot Control ──
