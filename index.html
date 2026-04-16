@@ -1737,7 +1737,6 @@ async function polyDeriveCredentials(){
 
     // 3. GET /auth/api-key — endpoint correto (não /derive-api-key)
     const funder=(gv('apiFunder')||'').trim()||wallet.address;
-    // Tentar GET primeiro (deriva chave existente), depois POST (cria nova)
     const authHeaders={
       'POLY_ADDRESS':wallet.address,
       'POLY_SIGNATURE':sig,
@@ -1745,14 +1744,20 @@ async function polyDeriveCredentials(){
       'POLY_NONCE':String(nonce),
       'Content-Type':'application/json'
     };
-    let credsRes=await fetch(`${POLY_HOST}/auth/api-key`,{method:'GET',headers:authHeaders});
-    if(credsRes.status===405){
-      log('GET não permitido, tentando POST...','i');
-      credsRes=await fetch(`${POLY_HOST}/auth/api-key`,{method:'POST',headers:authHeaders,body:JSON.stringify({})});
-    }
+    // GET /auth/derive-api-key — deriva chave existente
+    let credsRes=await fetch(`${POLY_HOST}/auth/derive-api-key`,{method:'GET',headers:authHeaders});
+    log('derive-api-key: HTTP '+credsRes.status,'i');
     if(!credsRes.ok){
       const errText=await credsRes.text();
-      throw new Error('api-key endpoint: HTTP '+credsRes.status+' — '+errText.slice(0,120));
+      // Se não existe chave, tentar criar via POST /auth/api-key
+      if(credsRes.status===404||credsRes.status===400){
+        log('Nenhuma chave existente, criando nova...','i');
+        credsRes=await fetch(`${POLY_HOST}/auth/api-key`,{method:'POST',headers:authHeaders,body:JSON.stringify({})});
+      }
+      if(!credsRes.ok){
+        const errText2=await credsRes.text();
+        throw new Error('HTTP '+credsRes.status+' — '+errText2.slice(0,120));
+      }
     }
     const creds=await credsRes.json();
     log('📦 Resposta: '+JSON.stringify(creds).slice(0,80),'i');
