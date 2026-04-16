@@ -1686,21 +1686,32 @@ setTimeout(fetchPolyPrices,2000);
 const POLY_HOST='https://clob.polymarket.com';
 const POLY_CHAIN=137;
 let _polyApiCreds=null; // {apiKey, secret, passphrase} — geradas da private key
+let _polyAuthFailed=false; // evitar loop de retry após falha
 
 // Derivar credenciais L2 da Private Key (L1 auth via EIP-712)
 async function polyDeriveCredentials(){
   try{
-    let pk=(gv('apiPrivKey')||'').trim().replace(/\s+/g,'');
+    let pk=(gv('apiPrivKey')||'').trim().replace(/[\s\n\r\t]/g,'');
     if(!pk)throw new Error('Private Key não preenchida');
-    // Normalizar: remover 0x se presente, depois adicionar
-    if(pk.startsWith('0x')||pk.startsWith('0X'))pk=pk.slice(2);
+
+    // Log de diagnóstico (sem mostrar a chave completa)
+    log(`🔍 Chave: ${pk.length} chars, começa com "${pk.slice(0,4)}", termina com "${pk.slice(-4)}"`, 'i');
+
+    // Normalizar: remover 0x se presente
+    const pkClean=pk.startsWith('0x')||pk.startsWith('0X')?pk.slice(2):pk;
+
     // Verificar se é hex válido de 64 caracteres
-    if(!/^[0-9a-fA-F]{64}$/.test(pk)){
-      log(`❌ Private Key inválida: ${pk.length} chars, esperado 64 hex. Verifique se copiou corretamente.`,'e');
-      throw new Error('Formato inválido: '+pk.length+' chars hex (esperado 64)');
+    if(pkClean.length!==64){
+      throw new Error('Tamanho incorreto: '+pkClean.length+' chars (esperado 64 sem o 0x)');
     }
-    pk='0x'+pk; // garantir prefixo 0x
-    const wallet=new ethers.Wallet(pk);
+    if(!/^[0-9a-fA-F]{64}$/.test(pkClean)){
+      // Mostrar quais caracteres são inválidos
+      const invalid=[...pkClean].filter(ch=>!/[0-9a-fA-F]/.test(ch));
+      throw new Error('Caracteres inválidos encontrados: '+[...new Set(invalid)].join(' '));
+    }
+    const pkFinal='0x'+pkClean;
+    log(`🔑 Formato OK — criando wallet...`,'i');
+    const wallet=new ethers.Wallet(pkFinal);
 
     // 1. Pegar timestamp do servidor CLOB
     const tsRes=await fetch(POLY_HOST+'/time');
@@ -1759,6 +1770,7 @@ async function polyDeriveCredentials(){
     updAPI();
     return true;
   }catch(e){
+    _polyAuthFailed=true;
     log(`❌ Auth Polymarket falhou: ${e.message}`,'e');
     _polyApiCreds=null;
     return false;
@@ -2357,8 +2369,8 @@ function updAPI(){
   if(card)card.style.display=ok?'block':'none';
 }
 
-// Atualizar saldo a cada 30s quando API configurada
-setInterval(()=>{if(apiConfigured()&&_polyApiCreds)checkPolyBalance();},30000);
+// Atualizar saldo a cada 30s quando API configurada (só se autenticado)
+setInterval(()=>{if(apiConfigured()&&_polyApiCreds&&!_polyAuthFailed)checkPolyBalance();},30000);
 function validatePrivKey(el){
   let v=el.value.trim().replace(/\s+/g,'');
   if(!v){g('privKeyHint').style.display='none';return;}
@@ -2376,7 +2388,7 @@ function validatePrivKey(el){
     hint.style.color='var(--dn)';
   }
 }
-['apiPrivKey','apiFunder'].forEach(id=>{const el=g(id);if(el)el.addEventListener('input',()=>{updAPI();saveConfig();if(apiConfigured())setTimeout(checkPolyBalance,500);});});
+['apiPrivKey','apiFunder'].forEach(id=>{const el=g(id);if(el)el.addEventListener('input',()=>{_polyAuthFailed=false;updAPI();saveConfig();if(apiConfigured())setTimeout(checkPolyBalance,500);});});
 
 // ── Bot Control ──
 function startBot(s){
