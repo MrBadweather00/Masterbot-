@@ -1737,17 +1737,19 @@ async function polyDeriveCredentials(){
 
     // 3. GET /auth/api-key — endpoint correto (não /derive-api-key)
     const funder=(gv('apiFunder')||'').trim()||wallet.address;
-    const credsRes=await fetch(`${POLY_HOST}/auth/api-key`,{
-      method:'POST',
-      headers:{
-        'POLY_ADDRESS':wallet.address,
-        'POLY_SIGNATURE':sig,
-        'POLY_TIMESTAMP':ts,
-        'POLY_NONCE':String(nonce),
-        'Content-Type':'application/json'
-      },
-      body:JSON.stringify({})
-    });
+    // Tentar GET primeiro (deriva chave existente), depois POST (cria nova)
+    const authHeaders={
+      'POLY_ADDRESS':wallet.address,
+      'POLY_SIGNATURE':sig,
+      'POLY_TIMESTAMP':ts,
+      'POLY_NONCE':String(nonce),
+      'Content-Type':'application/json'
+    };
+    let credsRes=await fetch(`${POLY_HOST}/auth/api-key`,{method:'GET',headers:authHeaders});
+    if(credsRes.status===405){
+      log('GET não permitido, tentando POST...','i');
+      credsRes=await fetch(`${POLY_HOST}/auth/api-key`,{method:'POST',headers:authHeaders,body:JSON.stringify({})});
+    }
     if(!credsRes.ok){
       const errText=await credsRes.text();
       throw new Error('api-key endpoint: HTTP '+credsRes.status+' — '+errText.slice(0,120));
