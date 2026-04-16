@@ -1713,19 +1713,11 @@ async function polyDeriveCredentials(){
     log(`🔑 Formato OK — criando wallet...`,'i');
     const wallet=new ethers.Wallet(pkFinal);
 
-    // 1. Pegar timestamp do servidor CLOB
-    const tsRes=await fetch(POLY_HOST+'/time');
-    const tsData=await tsRes.json();
-    const ts=String(tsData.time||Math.floor(Date.now()/1000));
+    // 1. Timestamp local (não depender do servidor)
+    const ts=String(Math.floor(Date.now()/1000));
+    const nonce=0; // Magic Wallet usa nonce=0
 
-    // 2. Pegar nonce atual
-    const nonceRes=await fetch(`${POLY_HOST}/auth/nonce`,{
-      headers:{'Content-Type':'application/json'}
-    });
-    const nonceData=await nonceRes.json();
-    const nonce=nonceData.nonce||0;
-
-    // 3. Assinar EIP-712 (L1)
+    // 2. Assinar EIP-712 (L1) — exatamente como a documentação
     const domain={name:'ClobAuthDomain',version:'1',chainId:POLY_CHAIN};
     const types={ClobAuth:[
       {name:'address',type:'address'},
@@ -1733,17 +1725,19 @@ async function polyDeriveCredentials(){
       {name:'nonce',type:'uint256'},
       {name:'message',type:'string'}
     ]};
-    const value={
+    const msgValue={
       address:wallet.address,
       timestamp:ts,
       nonce:nonce,
       message:'This message attests that I control the given wallet'
     };
-    const sig=await wallet._signTypedData(domain,types,value);
+    log('🔏 Assinando EIP-712...','i');
+    const sig=await wallet._signTypedData(domain,types,msgValue);
+    log('✓ Assinatura OK — buscando credenciais...','i');
 
-    // 4. Derivar/criar credenciais L2
-    const funder=gv('apiFunder')||wallet.address;
-    const credsRes=await fetch(`${POLY_HOST}/auth/derive-api-key`,{
+    // 3. GET /auth/api-key — endpoint correto (não /derive-api-key)
+    const funder=(gv('apiFunder')||'').trim()||wallet.address;
+    const credsRes=await fetch(`${POLY_HOST}/auth/api-key`,{
       method:'GET',
       headers:{
         'POLY_ADDRESS':wallet.address,
@@ -1754,10 +1748,12 @@ async function polyDeriveCredentials(){
       }
     });
     if(!credsRes.ok){
-      const err=await credsRes.text();
-      throw new Error('derive-api-key failed: '+err);
+      const errText=await credsRes.text();
+      throw new Error('api-key endpoint: HTTP '+credsRes.status+' — '+errText.slice(0,120));
     }
     const creds=await credsRes.json();
+    log('📦 Resposta: '+JSON.stringify(creds).slice(0,80),'i');
+    if(!creds.apiKey&&!creds.key)throw new Error('Sem apiKey na resposta: '+JSON.stringify(creds).slice(0,100));
     _polyApiCreds={
       apiKey:creds.apiKey||creds.key,
       secret:creds.secret,
