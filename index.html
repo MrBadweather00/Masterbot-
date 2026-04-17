@@ -536,7 +536,7 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
 
 <div id="loginScreen">
   <div class="login-box">
-    <div class="login-brand">MASTER<em>BOT</em><sup>v5.7</sup></div>
+    <div class="login-brand">MASTER<em>BOT</em><sup>v5.8</sup></div>
     <div class="login-sub">Acesso Restrito · Trading Platform</div>
     <div class="login-field">
       <label>Login</label>
@@ -554,7 +554,7 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
 <div id="appContent">
 <!-- ═══ TOPBAR ═══ -->
 <div class="topbar">
-  <div class="brand">MASTER<em>BOT</em><sup>v5.7</sup></div>
+  <div class="brand">MASTER<em>BOT</em><sup>v5.8</sup></div>
   <div class="chips" id="chips">
     <div class="chip active" data-sym="BTCUSDT" data-lbl="BTC">BTC</div>
     <div class="chip" data-sym="ETHUSDT" data-lbl="ETH">ETH</div>
@@ -1827,47 +1827,69 @@ async function polyL2Headers(method,path,body=''){
 // Verificar saldo USDC e portfolio
 async function polyGetBalance(){
   try{
+    // USDC livre: usar L2 auth (balance-allowance)
+    // Posições: usar data-api/value (público)
     const funder=(gv('apiFunder')||'').trim();
     const walletAddr=_polyApiCreds?_polyApiCreds.walletAddress:'';
-    // Testar todos os endereços conhecidos
-    const allAddrs=[funder,walletAddr].filter(a=>a&&a.startsWith('0x'));
-    const uniqueAddrs=[...new Set(allAddrs.map(a=>a.toLowerCase()))].map(a=>
-      allAddrs.find(x=>x.toLowerCase()===a)||a
-    );
     
-    log('🔍 Testando endereços: '+uniqueAddrs.map(a=>a.slice(0,10)).join(', '),'i');
-    
-    for(const addr of uniqueAddrs){
+    let cash=0, bets=0;
+
+    // 1. Buscar posições via data-api (público, sem auth)
+    const addrs=[...new Set([funder,walletAddr].filter(a=>a&&a.startsWith('0x')))];
+    for(const addr of addrs){
       try{
         const r=await fetch(`https://data-api.polymarket.com/value?user=${addr}`);
         if(r.ok){
           const d=await r.json();
-          log('data-api resposta para '+addr.slice(0,10)+': '+JSON.stringify(d).slice(0,120),'i');
           const arr=Array.isArray(d)?d:[d];
           const item=arr[0];
-          if(item&&item.value!=null){
-            const bets=parseFloat(item.value)||0;
-            let cash=0;
-            try{
-              const r2=await fetch(`https://gamma-api.polymarket.com/profiles?address=${addr}`);
-              if(r2.ok){
-                const d2=await r2.json();
-                log('gamma resposta: '+JSON.stringify(d2).slice(0,120),'i');
-                const p=Array.isArray(d2)?d2[0]:d2;
-                cash=parseFloat(p?.cashBalance||p?.portfolioValue||p?.balance||0);
-              }
-            }catch(e){}
-            const total=Math.max(cash,bets,cash+bets);
-            if(total>0){
-              log(`💰 Saldo encontrado: $${total.toFixed(2)}`,'s');
-              return {cash,bets,total};
-            }
-          }
+          bets=parseFloat(item?.value||0);
+          if(bets>0)break;
         }
-      }catch(e){log('erro '+addr.slice(0,8)+': '+e.message,'w');}
+      }catch(e){}
     }
-    log('⚠ Saldo $0 em todos os endereços testados','w');
-    return {cash:0,bets:0,total:0};
+
+    // 2. Buscar USDC livre via L2 auth (balance-allowance)
+    if(_polyApiCreds){
+      try{
+        const path='/balance-allowance?asset_type=0';
+        const ts=String(Math.floor(Date.now()/1000));
+        const msg=ts+'GET'+path;
+        // Decodificar secret base64
+        let secretBytes;
+        try{
+          const b64=_polyApiCreds.secret.replace(/-/g,'+').replace(/_/g,'/');
+          const bin=atob(b64);
+          secretBytes=new Uint8Array(bin.length);
+          for(let i=0;i<bin.length;i++)secretBytes[i]=bin.charCodeAt(i);
+        }catch(e){
+          secretBytes=new TextEncoder().encode(_polyApiCreds.secret);
+        }
+        const key=await crypto.subtle.importKey('raw',secretBytes,{name:'HMAC',hash:'SHA-256'},false,['sign']);
+        const sig=await crypto.subtle.sign('HMAC',key,new TextEncoder().encode(msg));
+        const sigB64=btoa(String.fromCharCode(...new Uint8Array(sig)));
+        const headers={
+          'POLY_ADDRESS':_polyApiCreds.walletAddress,
+          'POLY_SIGNATURE':sigB64,
+          'POLY_TIMESTAMP':ts,
+          'POLY_API_KEY':_polyApiCreds.apiKey,
+          'POLY_PASSPHRASE':_polyApiCreds.passphrase,
+          'Content-Type':'application/json'
+        };
+        const r=await fetch('https://clob.polymarket.com'+path,{headers});
+        log('balance-allowance HTTP '+r.status,'i');
+        if(r.ok){
+          const d=await r.json();
+          log('balance-allowance: '+JSON.stringify(d).slice(0,150),'i');
+          const raw=parseFloat(d.balance||d.allowance||0);
+          cash=raw>1000?raw/1e6:raw;
+        }
+      }catch(e){log('L2 balance erro: '+e.message,'w');}
+    }
+
+    const total=cash+bets;
+    log(`💰 USDC livre: $${cash.toFixed(2)} · Posições: $${bets.toFixed(2)} · Total: $${total.toFixed(2)}`,'i');
+    return {cash,bets,total};
   }catch(e){return {cash:0,bets:0,total:0};}
 }
 
