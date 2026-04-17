@@ -1811,31 +1811,29 @@ async function polyL2Headers(method,path,body=''){
 // Verificar saldo USDC
 async function polyGetBalance(){
   try{
-    // Endpoint não documentado — retorna cash, bets, equity (igual à UI)
-    const funder=gv('apiFunder')||(_polyApiCreds&&_polyApiCreds.funder)||'';
-    if(!funder)return null;
-    const headers=await polyL2Headers('GET',`/positions?user=${funder}`);
+    if(!_polyApiCreds)return null;
+    // GET /balance-allowance?asset_type=0 com L2 headers
+    // Retorna saldo USDC disponível em micro-USDC
+    const path='/balance-allowance?asset_type=0';
+    const headers=await polyL2Headers('GET',path);
     if(!headers)return null;
-
-    // Tentar endpoint de balance direto primeiro
-    const res1=await fetch(`${POLY_HOST}/data/balance?user=${funder}`,{headers});
-    if(res1.ok){
-      const d=await res1.json();
-      const cash=parseFloat(d.cash||d.balance||d.available||0);
-      const bets=parseFloat(d.bets||d.equity||0);
-      return {cash,bets,total:cash+bets};
+    const res=await fetch(POLY_HOST+path,{headers});
+    log('balance HTTP '+res.status,'i');
+    if(!res.ok){
+      const t=await res.text();
+      log('balance erro: '+t.slice(0,80),'w');
+      return null;
     }
-
-    // Fallback: buscar via get-balance-allowance (USDC collateral)
-    const headers2=await polyL2Headers('GET','/balance-allowance?asset_type=0');
-    const res2=await fetch(`${POLY_HOST}/balance-allowance?asset_type=0`,{headers:headers2||{}});
-    if(res2.ok){
-      const d=await res2.json();
-      const cash=parseFloat(d.balance||0)/1e6; // converte de micro-USDC
-      return {cash,bets:0,total:cash};
-    }
+    const d=await res.json();
+    log('balance resposta: '+JSON.stringify(d).slice(0,100),'i');
+    // balance pode estar em string micro-USDC ou float USDC
+    let cash=parseFloat(d.balance||d.allowance||0);
+    if(cash>1000)cash=cash/1e6; // micro-USDC → USDC
+    return {cash,bets:0,total:cash};
+  }catch(e){
+    log('balance exception: '+e.message,'w');
     return null;
-  }catch(e){return null;}
+  }
 }
 
 // Executar ordem real na Polymarket
