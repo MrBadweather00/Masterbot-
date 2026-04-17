@@ -1785,15 +1785,28 @@ async function polyDeriveCredentials(){
 }
 
 // Assinar header L2 (HMAC-SHA256)
+// Documentação: https://docs.polymarket.com/developers/CLOB/authentication
 async function polyL2Headers(method,path,body=''){
   if(!_polyApiCreds)return null;
   try{
     const ts=String(Math.floor(Date.now()/1000));
-    const msg=ts+method.toUpperCase()+path+(body||'');
-    // HMAC-SHA256 usando Web Crypto API (disponível no browser)
+    // Mensagem = timestamp + METHOD + path + body
+    const bodyStr=body||'';
+    const msg=ts+method.toUpperCase()+path+bodyStr;
+    // secret é base64 — precisa decodificar antes de usar como chave HMAC
+    let secretBytes;
+    try{
+      // Tentar decodificar base64
+      const b64=_polyApiCreds.secret.replace(/-/g,'+').replace(/_/g,'/');
+      const bin=atob(b64);
+      secretBytes=new Uint8Array(bin.length);
+      for(let i=0;i<bin.length;i++)secretBytes[i]=bin.charCodeAt(i);
+    }catch(e){
+      // Se não é base64 válido, usar como string direta
+      secretBytes=new TextEncoder().encode(_polyApiCreds.secret);
+    }
     const key=await crypto.subtle.importKey(
-      'raw',new TextEncoder().encode(_polyApiCreds.secret),
-      {name:'HMAC',hash:'SHA-256'},false,['sign']
+      'raw',secretBytes,{name:'HMAC',hash:'SHA-256'},false,['sign']
     );
     const sig=await crypto.subtle.sign('HMAC',key,new TextEncoder().encode(msg));
     const sigB64=btoa(String.fromCharCode(...new Uint8Array(sig)));
@@ -1805,7 +1818,10 @@ async function polyL2Headers(method,path,body=''){
       'POLY_PASSPHRASE':_polyApiCreds.passphrase,
       'Content-Type':'application/json'
     };
-  }catch(e){return null;}
+  }catch(e){
+    log('L2 headers erro: '+e.message,'w');
+    return null;
+  }
 }
 
 // Verificar saldo USDC
