@@ -536,7 +536,7 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
 
 <div id="loginScreen">
   <div class="login-box">
-    <div class="login-brand">MASTER<em>BOT</em><sup>v5.4</sup></div>
+    <div class="login-brand">MASTER<em>BOT</em><sup>v5.5</sup></div>
     <div class="login-sub">Acesso Restrito · Trading Platform</div>
     <div class="login-field">
       <label>Login</label>
@@ -554,7 +554,7 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
 <div id="appContent">
 <!-- ═══ TOPBAR ═══ -->
 <div class="topbar">
-  <div class="brand">MASTER<em>BOT</em><sup>v5.4</sup></div>
+  <div class="brand">MASTER<em>BOT</em><sup>v5.5</sup></div>
   <div class="chips" id="chips">
     <div class="chip active" data-sym="BTCUSDT" data-lbl="BTC">BTC</div>
     <div class="chip" data-sym="ETHUSDT" data-lbl="ETH">ETH</div>
@@ -2388,21 +2388,27 @@ setInterval(()=>{if(BU.running)inTimeWindow('u');if(BD.running)inTimeWindow('d')
 
 // ── API ──
 function apiConfigured(){
-  let pk=(gv('apiPrivKey')||'').trim();
+  let pk=(gv('apiPrivKey')||'').trim().replace(/[\s\n\r\t]/g,'');
   let fu=(gv('apiFunder')||'').trim();
+  // Normalizar private key — remover 0x se presente
   if(pk.startsWith('0x')||pk.startsWith('0X'))pk=pk.slice(2);
   const pkOk=/^[0-9a-fA-F]{64}$/.test(pk);
+  // Funder: aceitar qualquer endereço Ethereum válido (42 chars com 0x)
   const fuOk=fu.startsWith('0x')&&fu.length>=40;
   return pkOk&&fuOk;
 }
 function updAPI(){
   const ok=apiConfigured();
+  // Debug
+  let pk=(gv('apiPrivKey')||'').trim().replace(/[\s\n\r\t]/g,'');
+  let fu=(gv('apiFunder')||'').trim();
+  if(pk.startsWith('0x'))pk=pk.slice(2);
+  log('🔧 API check: pk='+pk.length+'chars hex='+/^[0-9a-fA-F]{64}$/.test(pk)+' fu='+fu.length+'chars ok='+ok,'i');
   ['apiDot','apiDot2'].forEach(id=>{const el=g(id);if(el)el.className='api-dot'+(ok?' ok':'');});
   const msg=ok?'✅ Configurada — modo REAL':'⚠ Sem API — modo simulação';
   ['apiStatus','apiStatus2'].forEach(id=>{const el=g(id);if(el)el.textContent=msg;});
   g('simBadge').textContent=ok?'REAL':'SIM';
   g('simBadge').className='sim-badge'+(ok?' real':'');
-  // Mostrar/esconder card de saldo no EdgeBot
   const card=g('polyBalanceCard');
   if(card)card.style.display=ok?'block':'none';
 }
