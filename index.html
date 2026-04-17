@@ -536,7 +536,7 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
 
 <div id="loginScreen">
   <div class="login-box">
-    <div class="login-brand">MASTER<em>BOT</em><sup>v5.6</sup></div>
+    <div class="login-brand">MASTER<em>BOT</em><sup>v5.7</sup></div>
     <div class="login-sub">Acesso Restrito · Trading Platform</div>
     <div class="login-field">
       <label>Login</label>
@@ -554,7 +554,7 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
 <div id="appContent">
 <!-- ═══ TOPBAR ═══ -->
 <div class="topbar">
-  <div class="brand">MASTER<em>BOT</em><sup>v5.6</sup></div>
+  <div class="brand">MASTER<em>BOT</em><sup>v5.7</sup></div>
   <div class="chips" id="chips">
     <div class="chip active" data-sym="BTCUSDT" data-lbl="BTC">BTC</div>
     <div class="chip" data-sym="ETHUSDT" data-lbl="ETH">ETH</div>
@@ -1829,37 +1829,44 @@ async function polyGetBalance(){
   try{
     const funder=(gv('apiFunder')||'').trim();
     const walletAddr=_polyApiCreds?_polyApiCreds.walletAddress:'';
-    const uniqueAddrs=[...new Set([funder,walletAddr].filter(a=>a&&a.startsWith('0x')))];
-
+    // Testar todos os endereços conhecidos
+    const allAddrs=[funder,walletAddr].filter(a=>a&&a.startsWith('0x'));
+    const uniqueAddrs=[...new Set(allAddrs.map(a=>a.toLowerCase()))].map(a=>
+      allAddrs.find(x=>x.toLowerCase()===a)||a
+    );
+    
+    log('🔍 Testando endereços: '+uniqueAddrs.map(a=>a.slice(0,10)).join(', '),'i');
+    
     for(const addr of uniqueAddrs){
       try{
-        // Endpoint oficial: GET /value?user=ADDRESS
-        // Retorna valor das posições abertas
         const r=await fetch(`https://data-api.polymarket.com/value?user=${addr}`);
         if(r.ok){
           const d=await r.json();
+          log('data-api resposta para '+addr.slice(0,10)+': '+JSON.stringify(d).slice(0,120),'i');
           const arr=Array.isArray(d)?d:[d];
-          const item=arr.find(x=>x.user&&x.user.toLowerCase()===addr.toLowerCase())||arr[0];
+          const item=arr[0];
           if(item&&item.value!=null){
             const bets=parseFloat(item.value)||0;
-            log(`💰 Portfolio ${addr.slice(0,8)}: $${bets.toFixed(2)} (posições)`, 'i');
-            // Buscar também saldo USDC disponível via Gamma profiles
             let cash=0;
             try{
               const r2=await fetch(`https://gamma-api.polymarket.com/profiles?address=${addr}`);
               if(r2.ok){
                 const d2=await r2.json();
+                log('gamma resposta: '+JSON.stringify(d2).slice(0,120),'i');
                 const p=Array.isArray(d2)?d2[0]:d2;
-                cash=parseFloat(p?.cashBalance||p?.balance||0);
+                cash=parseFloat(p?.cashBalance||p?.portfolioValue||p?.balance||0);
               }
             }catch(e){}
-            const total=cash+bets;
-            log(`💰 ${addr.slice(0,8)}: USDC livre $${cash.toFixed(2)} + apostas $${bets.toFixed(2)} = $${total.toFixed(2)}`,'i');
-            return {cash,bets,total};
+            const total=Math.max(cash,bets,cash+bets);
+            if(total>0){
+              log(`💰 Saldo encontrado: $${total.toFixed(2)}`,'s');
+              return {cash,bets,total};
+            }
           }
         }
-      }catch(e){}
+      }catch(e){log('erro '+addr.slice(0,8)+': '+e.message,'w');}
     }
+    log('⚠ Saldo $0 em todos os endereços testados','w');
     return {cash:0,bets:0,total:0};
   }catch(e){return {cash:0,bets:0,total:0};}
 }
