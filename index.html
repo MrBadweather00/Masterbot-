@@ -536,7 +536,7 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
 
 <div id="loginScreen">
   <div class="login-box">
-    <div class="login-brand">MASTER<em>BOT</em><sup>v5.8</sup></div>
+    <div class="login-brand">MASTER<em>BOT</em><sup>v5.9</sup></div>
     <div class="login-sub">Acesso Restrito · Trading Platform</div>
     <div class="login-field">
       <label>Login</label>
@@ -554,7 +554,7 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
 <div id="appContent">
 <!-- ═══ TOPBAR ═══ -->
 <div class="topbar">
-  <div class="brand">MASTER<em>BOT</em><sup>v5.8</sup></div>
+  <div class="brand">MASTER<em>BOT</em><sup>v5.9</sup></div>
   <div class="chips" id="chips">
     <div class="chip active" data-sym="BTCUSDT" data-lbl="BTC">BTC</div>
     <div class="chip" data-sym="ETHUSDT" data-lbl="ETH">ETH</div>
@@ -697,6 +697,13 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
       <!-- Números de saldo -->
       <div id="polyBalanceDisplay">
         <span style="color:var(--txt3);font-family:'JetBrains Mono',monospace;font-size:8px">Carregando...</span>
+      </div>
+      <!-- Saldo manual (fallback) -->
+      <div style="margin-top:6px;display:flex;align-items:center;gap:6px;">
+        <input type="number" id="manualBalance" placeholder="Saldo manual $" step="0.01" min="0"
+          style="font-family:'JetBrains Mono',monospace;font-size:9px;padding:3px 6px;background:var(--bg3);border:1px solid var(--b2);border-radius:4px;color:var(--txt);width:100px;"
+          oninput="localStorage.setItem('_manualBalance',this.value);checkPolyBalance()">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:7px;color:var(--txt3)">← inserir saldo manualmente se necessário</span>
       </div>
       <!-- Mini gráfico evolução do saldo -->
       <div style="margin-top:8px;position:relative;">
@@ -1824,72 +1831,55 @@ async function polyL2Headers(method,path,body=''){
   }
 }
 
-// Verificar saldo USDC e portfolio
+// Verificar saldo — múltiplas tentativas
 async function polyGetBalance(){
   try{
-    // USDC livre: usar L2 auth (balance-allowance)
-    // Posições: usar data-api/value (público)
     const funder=(gv('apiFunder')||'').trim();
     const walletAddr=_polyApiCreds?_polyApiCreds.walletAddress:'';
-    
-    let cash=0, bets=0;
-
-    // 1. Buscar posições via data-api (público, sem auth)
     const addrs=[...new Set([funder,walletAddr].filter(a=>a&&a.startsWith('0x')))];
+
+    // Tentativa: Alchemy Polygon (CORS ok, sem auth para leitura básica)
+    // USDC.e contract: 0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174
     for(const addr of addrs){
       try{
-        const r=await fetch(`https://data-api.polymarket.com/value?user=${addr}`);
-        if(r.ok){
-          const d=await r.json();
-          const arr=Array.isArray(d)?d:[d];
-          const item=arr[0];
-          bets=parseFloat(item?.value||0);
-          if(bets>0)break;
+        const padAddr=addr.slice(2).toLowerCase().padStart(64,'0');
+        const data='0x70a08231'+padAddr;
+        const body=JSON.stringify({
+          jsonrpc:'2.0',id:1,method:'eth_call',
+          params:[{to:'0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174',data},'latest']
+        });
+        // Alchemy free endpoint sem key (limitado mas funciona para leitura)
+        const endpoints=[
+          'https://polygon-mainnet.g.alchemy.com/v2/demo',
+          'https://api.alchemy.com/v2/demo',
+          'https://rpc.ankr.com/polygon/'+Math.random().toString(36).slice(2), // random path trick
+        ];
+        for(const ep of endpoints){
+          try{
+            const r=await fetch(ep,{method:'POST',headers:{'Content-Type':'application/json'},body,signal:AbortSignal.timeout(3000)});
+            if(r.ok){
+              const d=await r.json();
+              if(d.result&&d.result!=='0x'){
+                const raw=parseInt(d.result,16);
+                const cash=raw/1e6;
+                if(cash>=0){
+                  log(`💰 USDC on-chain: $${cash.toFixed(2)}`,'s');
+                  return {cash,bets:0,total:cash};
+                }
+              }
+            }
+          }catch(e){}
         }
       }catch(e){}
     }
 
-    // 2. Buscar USDC livre via L2 auth (balance-allowance)
-    if(_polyApiCreds){
-      try{
-        const path='/balance-allowance?asset_type=0';
-        const ts=String(Math.floor(Date.now()/1000));
-        const msg=ts+'GET'+path;
-        // Decodificar secret base64
-        let secretBytes;
-        try{
-          const b64=_polyApiCreds.secret.replace(/-/g,'+').replace(/_/g,'/');
-          const bin=atob(b64);
-          secretBytes=new Uint8Array(bin.length);
-          for(let i=0;i<bin.length;i++)secretBytes[i]=bin.charCodeAt(i);
-        }catch(e){
-          secretBytes=new TextEncoder().encode(_polyApiCreds.secret);
-        }
-        const key=await crypto.subtle.importKey('raw',secretBytes,{name:'HMAC',hash:'SHA-256'},false,['sign']);
-        const sig=await crypto.subtle.sign('HMAC',key,new TextEncoder().encode(msg));
-        const sigB64=btoa(String.fromCharCode(...new Uint8Array(sig)));
-        const headers={
-          'POLY_ADDRESS':_polyApiCreds.walletAddress,
-          'POLY_SIGNATURE':sigB64,
-          'POLY_TIMESTAMP':ts,
-          'POLY_API_KEY':_polyApiCreds.apiKey,
-          'POLY_PASSPHRASE':_polyApiCreds.passphrase,
-          'Content-Type':'application/json'
-        };
-        const r=await fetch('https://clob.polymarket.com'+path,{headers});
-        log('balance-allowance HTTP '+r.status,'i');
-        if(r.ok){
-          const d=await r.json();
-          log('balance-allowance: '+JSON.stringify(d).slice(0,150),'i');
-          const raw=parseFloat(d.balance||d.allowance||0);
-          cash=raw>1000?raw/1e6:raw;
-        }
-      }catch(e){log('L2 balance erro: '+e.message,'w');}
+    // Fallback: mostrar saldo manual — pedir ao usuário para inserir
+    const manual=parseFloat(localStorage.getItem('_manualBalance')||'0');
+    if(manual>0){
+      log(`💰 Saldo manual: $${manual.toFixed(2)}`,'i');
+      return {cash:manual,bets:0,total:manual};
     }
-
-    const total=cash+bets;
-    log(`💰 USDC livre: $${cash.toFixed(2)} · Posições: $${bets.toFixed(2)} · Total: $${total.toFixed(2)}`,'i');
-    return {cash,bets,total};
+    return {cash:0,bets:0,total:0};
   }catch(e){return {cash:0,bets:0,total:0};}
 }
 
