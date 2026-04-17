@@ -536,7 +536,7 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
 
 <div id="loginScreen">
   <div class="login-box">
-    <div class="login-brand">MASTER<em>BOT</em><sup>v6.0</sup></div>
+    <div class="login-brand">MASTER<em>BOT</em><sup>v6.1</sup></div>
     <div class="login-sub">Acesso Restrito · Trading Platform</div>
     <div class="login-field">
       <label>Login</label>
@@ -554,7 +554,7 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
 <div id="appContent">
 <!-- ═══ TOPBAR ═══ -->
 <div class="topbar">
-  <div class="brand">MASTER<em>BOT</em><sup>v6.0</sup></div>
+  <div class="brand">MASTER<em>BOT</em><sup>v6.1</sup></div>
   <div class="chips" id="chips">
     <div class="chip active" data-sym="BTCUSDT" data-lbl="BTC">BTC</div>
     <div class="chip" data-sym="ETHUSDT" data-lbl="ETH">ETH</div>
@@ -1543,22 +1543,34 @@ async function fetchPolyPrices(){
     if(!r1.ok)throw new Error('gamma API '+r1.status);
     const markets=await r1.json();
     
-    // Filtrar pelo mercado de 5min mais próximo
+    // Log para diagnóstico
+    log('🔍 Poly mercados encontrados: '+markets.length+' | exemplos: '+markets.slice(0,3).map(m=>m.question||m.slug||'?').join(' | '),'i');
+    
+    // Filtrar pelo mercado de 5min — aceitar português e inglês
     const now=Date.now();
     const btcMarkets=markets.filter(m=>{
       const q=(m.question||m.title||'').toLowerCase();
-      return q.includes(sym.toLowerCase())&&(q.includes('5 min')||q.includes('5min'));
+      const hasBtc=q.includes('btc')||q.includes('bitcoin');
+      const has5min=q.includes('5 min')||q.includes('5min')||q.includes('minuto')||q.includes('minute');
+      return hasBtc&&has5min;
     });
     
-    if(!btcMarkets.length){
-      P.error='Nenhum mercado BTC 5min ativo';
+    // Se não encontrou com filtro restrito, pegar qualquer mercado BTC ativo próximo
+    const allBtc=btcMarkets.length?btcMarkets:markets.filter(m=>{
+      const q=(m.question||m.title||'').toLowerCase();
+      return q.includes('btc')||q.includes('bitcoin');
+    });
+    
+    if(!allBtc.length){
+      P.error='Nenhum mercado BTC ativo';
+      log('⚠ Poly: nenhum mercado BTC encontrado. Mercados: '+markets.map(m=>m.slug||m.question).join(', ').slice(0,200),'w');
       P.fetching=false;
       updPolyDisplay();
       return;
     }
     
     // Pegar o mercado que fecha mais próximo do futuro
-    const market=btcMarkets.sort((a,b)=>{
+    const market=allBtc.sort((a,b)=>{
       const ea=new Date(a.endDate||a.end_date||0).getTime();
       const eb=new Date(b.endDate||b.end_date||0).getTime();
       const da=Math.abs(ea-now),db=Math.abs(eb-now);
@@ -1568,6 +1580,7 @@ async function fetchPolyPrices(){
     P.marketSlug=market.slug||market.conditionId;
     P.marketEnd=new Date(market.endDate||market.end_date||0).getTime();
     P.error=null;
+    log('✓ Mercado: '+(market.question||market.slug||'?')+' | tokens: '+JSON.stringify((market.tokens||market.outcomes||[]).map(t=>({n:t.outcome||t.title||t.name,id:(t.token_id||t.tokenId||'').slice(0,12)}))).slice(0,200),'i');
     
     // 2. Extrair token IDs
     const tokens=market.tokens||market.outcomes||[];
@@ -2705,7 +2718,8 @@ function executeTrade(B){
   const actualDir=effectiveDir==='up'?'UP':'DOWN';
   const et=strong?(effectiveDir==='up'?'⚡↑':'⚡↓'):'';
   const tag=apiConfigured()?'[REAL]':'[SIM]';
-  log(`🔍 Modo: ${tag} | apiOk:${apiConfigured()} | creds:${!!_polyApiCreds} | tokenId:${s==='u'?P.upTokenId:P.dnTokenId}`,'i');
+  const _tid=s==='u'?P.upTokenId:P.dnTokenId;
+  log(`🔍 Modo: ${tag} | creds:${!!_polyApiCreds} | tokenId:${_tid?_tid.slice(0,12):'NONE'} | upPrice:${P.upPrice} | dnPrice:${P.dnPrice}`,'i');
   const entryTime=now();
 
   // ENTER — lock definitivo
