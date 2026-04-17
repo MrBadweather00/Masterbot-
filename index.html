@@ -536,7 +536,7 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
 
 <div id="loginScreen">
   <div class="login-box">
-    <div class="login-brand">MASTER<em>BOT</em><sup>v5.9</sup></div>
+    <div class="login-brand">MASTER<em>BOT</em><sup>v6.0</sup></div>
     <div class="login-sub">Acesso Restrito · Trading Platform</div>
     <div class="login-field">
       <label>Login</label>
@@ -554,7 +554,7 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
 <div id="appContent">
 <!-- ═══ TOPBAR ═══ -->
 <div class="topbar">
-  <div class="brand">MASTER<em>BOT</em><sup>v5.9</sup></div>
+  <div class="brand">MASTER<em>BOT</em><sup>v6.0</sup></div>
   <div class="chips" id="chips">
     <div class="chip active" data-sym="BTCUSDT" data-lbl="BTC">BTC</div>
     <div class="chip" data-sym="ETHUSDT" data-lbl="ETH">ETH</div>
@@ -689,7 +689,8 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
     <div id="polyBalanceCard" style="display:none;background:var(--bg2);border:1px solid var(--b2);border-radius:10px;padding:10px;margin-bottom:8px;">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
         <div style="font-family:'JetBrains Mono',monospace;font-size:7px;color:var(--txt3);letter-spacing:1px">💰 SALDO POLYMARKET</div>
-        <div style="display:flex;align-items:center;gap:8px;">
+        <div style="display:flex;align-items:center;gap:6px;">
+          <button onclick="polyAutoRedeem()" title="Resgatar wins automaticamente" style="padding:2px 7px;background:rgba(0,229,160,.15);border:1px solid var(--up);border-radius:4px;color:var(--up);font-size:7px;cursor:pointer;font-family:'JetBrains Mono',monospace">💸 Resgatar</button>
           <button onclick="checkPolyBalance()" style="padding:2px 7px;background:var(--bg3);border:1px solid var(--b2);border-radius:4px;color:var(--txt2);font-size:8px;cursor:pointer;font-family:'JetBrains Mono',monospace">↺</button>
           <div style="font-family:'JetBrains Mono',monospace;font-size:7px;color:var(--up)" id="polyConnStatus">● REAL</div>
         </div>
@@ -2035,6 +2036,58 @@ function updBalanceDisplay(cash,bets,total){
     </div>`;
 }
 
+
+// ── Resgate automático de WIN (redeem tokens → USDC) ──
+async function polyRedeemWin(conditionId, indexSets){
+  if(!_polyApiCreds)return;
+  try{
+    // Usar endpoint de redeem da Polymarket (sem gas para Magic Wallet)
+    const funder=_polyApiCreds.funder;
+    const ts=String(Math.floor(Date.now()/1000));
+    const body=JSON.stringify({
+      conditionId,
+      indexSets:indexSets||[1,2], // [1=YES, 2=NO] — resgatar o vencedor
+      funder
+    });
+    const headers=await polyL2Headers('POST','/redeem',body);
+    if(!headers){log('⚠ Redeem: sem headers L2','w');return;}
+    const r=await fetch(POLY_HOST+'/redeem',{method:'POST',headers,body});
+    if(r.ok){
+      const d=await r.json();
+      log('✅ Redeem executado: '+JSON.stringify(d).slice(0,80),'s');
+    }else{
+      const err=await r.text();
+      log('⚠ Redeem falhou: '+err.slice(0,80),'w');
+    }
+  }catch(e){log('Redeem erro: '+e.message,'w');}
+}
+
+// Auto-redeem: verifica posições resolvidas e resgata automaticamente
+async function polyAutoRedeem(){
+  if(!_polyApiCreds)return;
+  try{
+    const funder=_polyApiCreds.funder||_polyApiCreds.walletAddress;
+    // Buscar posições do usuário
+    const r=await fetch(`https://data-api.polymarket.com/positions?user=${funder}&sizeThreshold=0.01`);
+    if(!r.ok)return;
+    const positions=await r.json();
+    if(!Array.isArray(positions)||!positions.length)return;
+    // Filtrar posições em mercados já resolvidos (redeemable)
+    const redeemable=positions.filter(p=>p.redeemable||p.outcome==='won'||p.resolved);
+    if(!redeemable.length){
+      log('ℹ Auto-redeem: sem posições para resgatar','i');
+      return;
+    }
+    log(`🎯 Auto-redeem: ${redeemable.length} posição(ões) para resgatar`,'s');
+    for(const pos of redeemable){
+      if(pos.conditionId||pos.condition_id){
+        await polyRedeemWin(pos.conditionId||pos.condition_id,[1,2]);
+        await new Promise(r=>setTimeout(r,1000));
+      }
+    }
+  }catch(e){log('Auto-redeem erro: '+e.message,'w');}
+}
+
 // ── Kline Open (referência do período) ──
 async function fetchKlineOpen(sym,tf,pStartMs){
   // Mapear tf para intervalo Binance
@@ -2652,6 +2705,7 @@ function executeTrade(B){
   const actualDir=effectiveDir==='up'?'UP':'DOWN';
   const et=strong?(effectiveDir==='up'?'⚡↑':'⚡↓'):'';
   const tag=apiConfigured()?'[REAL]':'[SIM]';
+  log(`🔍 Modo: ${tag} | apiOk:${apiConfigured()} | creds:${!!_polyApiCreds} | tokenId:${s==='u'?P.upTokenId:P.dnTokenId}`,'i');
   const entryTime=now();
 
   // ENTER — lock definitivo
@@ -2696,7 +2750,7 @@ function executeTrade(B){
     const resMsg=frozenDir==='up'
       ?`final $${finalPrice.toFixed(2)} ${finalPrice>=periodRefAtEntry?'≥':'<'} ref $${periodRefAtEntry.toFixed(2)} → ${finalPrice>=periodRefAtEntry?'UP WIN':'UP LOSS'}`
       :`final $${finalPrice.toFixed(2)} ${finalPrice<periodRefAtEntry?'<':'≥'} ref $${periodRefAtEntry.toFixed(2)} → ${finalPrice<periodRefAtEntry?'DN WIN':'DN LOSS'}`;
-    if(win)log(`${tag} ${dirLabel} #${B.rounds} ✓ WIN · ${resMsg} · +${profit.toFixed(2)} USDC`,'s');
+    if(win){log(`${tag} ${dirLabel} #${B.rounds} ✓ WIN · ${resMsg} · +${profit.toFixed(2)} USDC`,'s');if(apiConfigured()&&_polyApiCreds)setTimeout(polyAutoRedeem,2000);}
     else   log(`${tag} ${dirLabel} #${B.rounds} ✗ LOSS · ${resMsg} · -${sz.toFixed(2)} USDC`,'e');
 
     addTradeRow(s,B.rounds,et,sz,win,pd,Math.round(polyP*100),entryTime,entryDiff,tIn);
