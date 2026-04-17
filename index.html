@@ -536,7 +536,7 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
 
 <div id="loginScreen">
   <div class="login-box">
-    <div class="login-brand">MASTER<em>BOT</em><sup>v5.0</sup></div>
+    <div class="login-brand">MASTER<em>BOT</em><sup>v5.1</sup></div>
     <div class="login-sub">Acesso Restrito · Trading Platform</div>
     <div class="login-field">
       <label>Login</label>
@@ -554,7 +554,7 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
 <div id="appContent">
 <!-- ═══ TOPBAR ═══ -->
 <div class="topbar">
-  <div class="brand">MASTER<em>BOT</em><sup>v5.0</sup></div>
+  <div class="brand">MASTER<em>BOT</em><sup>v5.1</sup></div>
   <div class="chips" id="chips">
     <div class="chip active" data-sym="BTCUSDT" data-lbl="BTC">BTC</div>
     <div class="chip" data-sym="ETHUSDT" data-lbl="ETH">ETH</div>
@@ -1825,31 +1825,42 @@ async function polyL2Headers(method,path,body=''){
 }
 
 // Verificar saldo USDC via Polygon RPC (sem autenticação)
-// USDC.e no Polygon: 0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174
 async function polyGetBalance(){
   try{
     const funder=(gv('apiFunder')||'').trim();
     if(!funder||!funder.startsWith('0x'))return null;
-    // balanceOf(address) via eth_call — público, sem auth
     const addr=funder.slice(2).toLowerCase().padStart(64,'0');
-    const data='0x70a08231'+addr; // balanceOf selector + address
+    const data='0x70a08231'+addr;
     const body=JSON.stringify({
       jsonrpc:'2.0',id:1,method:'eth_call',
       params:[{to:'0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174',data},'latest']
     });
-    const res=await fetch('https://polygon-rpc.com',{
-      method:'POST',headers:{'Content-Type':'application/json'},body
-    });
-    if(!res.ok)return null;
-    const d=await res.json();
-    if(!d.result||d.result==='0x')return {cash:0,bets:0,total:0};
-    // USDC.e tem 6 decimais
-    const raw=parseInt(d.result,16);
-    const cash=raw/1e6;
-    log('💰 Saldo USDC on-chain: '+cash.toFixed(2),'i');
-    return {cash,bets:0,total:cash};
+    // Tentar múltiplos RPCs públicos com CORS
+    const rpcs=[
+      'https://rpc.ankr.com/polygon',
+      'https://polygon.llamarpc.com',
+      'https://polygon-rpc.com'
+    ];
+    for(const rpc of rpcs){
+      try{
+        const res=await fetch(rpc,{
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body
+        });
+        if(!res.ok)continue;
+        const d=await res.json();
+        if(!d.result)continue;
+        const raw=parseInt(d.result,16)||0;
+        const cash=raw/1e6;
+        log('💰 Saldo USDC: '+cash.toFixed(2)+' (via '+rpc.split('/')[2]+')','i');
+        return {cash,bets:0,total:cash};
+      }catch(e){continue;}
+    }
+    log('⚠ Todos os RPCs falharam','w');
+    return null;
   }catch(e){
-    log('balance RPC erro: '+e.message,'w');
+    log('balance erro: '+e.message,'w');
     return null;
   }
 }
