@@ -536,7 +536,7 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
 
 <div id="loginScreen">
   <div class="login-box">
-    <div class="login-brand">MASTER<em>BOT</em><sup>v6.9</sup></div>
+    <div class="login-brand">MASTER<em>BOT</em><sup>v7.0</sup></div>
     <div class="login-sub">Acesso Restrito · Trading Platform</div>
     <div class="login-field">
       <label>Login</label>
@@ -554,7 +554,7 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
 <div id="appContent">
 <!-- ═══ TOPBAR ═══ -->
 <div class="topbar">
-  <div class="brand">MASTER<em>BOT</em><sup>v6.9</sup></div>
+  <div class="brand">MASTER<em>BOT</em><sup>v7.0</sup></div>
   <div class="chips" id="chips">
     <div class="chip active" data-sym="BTCUSDT" data-lbl="BTC">BTC</div>
     <div class="chip" data-sym="ETHUSDT" data-lbl="ETH">ETH</div>
@@ -1656,10 +1656,12 @@ async function polyL2Headers(method,requestPath,body=''){
     sigB64=sigB64.replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
     log('🔐 L2: ts='+ts+' msg='+message.slice(0,60)+' sig='+sigB64.slice(0,20),'i');
     
-    // POLY_ADDRESS = endereço do signer (EOA da private key)
-    // Para Magic Wallet: o signer é o EOA, o funder é o proxy/profile
+    // Para Magic Wallet (signatureType=1):
+    // POLY_ADDRESS = funder (proxy/profile address), não o signer EOA
+    const addrForL2=_polyApiCreds.funder||_polyApiCreds.walletAddress;
+    log('L2 addr: '+addrForL2.slice(0,12)+'... key:'+_polyApiCreds.apiKey.slice(0,8),'i');
     return{
-      'POLY_ADDRESS':_polyApiCreds.walletAddress,
+      'POLY_ADDRESS':addrForL2,
       'POLY_SIGNATURE':sigB64,
       'POLY_TIMESTAMP':ts,
       'POLY_API_KEY':_polyApiCreds.apiKey,
