@@ -536,7 +536,7 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
 
 <div id="loginScreen">
   <div class="login-box">
-    <div class="login-brand">MASTER<em>BOT</em><sup>v6.5</sup></div>
+    <div class="login-brand">MASTER<em>BOT</em><sup>v6.6</sup></div>
     <div class="login-sub">Acesso Restrito · Trading Platform</div>
     <div class="login-field">
       <label>Login</label>
@@ -554,7 +554,7 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
 <div id="appContent">
 <!-- ═══ TOPBAR ═══ -->
 <div class="topbar">
-  <div class="brand">MASTER<em>BOT</em><sup>v6.5</sup></div>
+  <div class="brand">MASTER<em>BOT</em><sup>v6.6</sup></div>
   <div class="chips" id="chips">
     <div class="chip active" data-sym="BTCUSDT" data-lbl="BTC">BTC</div>
     <div class="chip" data-sym="ETHUSDT" data-lbl="ETH">ETH</div>
@@ -1623,97 +1623,157 @@ async function fetchPolyPrices(){
 
 
 
-// Assinar header L2 (HMAC-SHA256)
-async function polyL2Headers(method,path,body=''){
+// ── L2 HMAC-SHA256 Headers ──
+// Formato: HMAC(base64url_decode(secret), timestamp + METHOD + path + body)
+// Output: base64url
+async function polyL2Headers(method,requestPath,body=''){
   if(!_polyApiCreds)return null;
   try{
     const ts=String(Math.floor(Date.now()/1000));
-    const msg=ts+method.toUpperCase()+path+(body||'');
-    let secretBytes;
-    try{
-      let b64=_polyApiCreds.secret.replace(/-/g,'+').replace(/_/g,'/');
-      while(b64.length%4)b64+='=';
-      const bin=atob(b64);
-      secretBytes=new Uint8Array(bin.length);
-      for(let i=0;i<bin.length;i++)secretBytes[i]=bin.charCodeAt(i);
-    }catch(e2){secretBytes=new TextEncoder().encode(_polyApiCreds.secret);}
-    const key=await crypto.subtle.importKey('raw',secretBytes,{name:'HMAC',hash:'SHA-256'},false,['sign']);
-    const sig=await crypto.subtle.sign('HMAC',key,new TextEncoder().encode(msg));
-    const sigB64=btoa(String.fromCharCode(...new Uint8Array(sig)));
+    const bodyStr=typeof body==='string'?body:(body?JSON.stringify(body):'');
+    const message=ts+method.toUpperCase()+requestPath+bodyStr;
+    
+    // Decodificar secret (base64url) para bytes
+    let b64=_polyApiCreds.secret.replace(/-/g,'+').replace(/_/g,'/');
+    while(b64.length%4)b64+='=';
+    const bin=atob(b64);
+    const secretBytes=new Uint8Array(bin.length);
+    for(let i=0;i<bin.length;i++)secretBytes[i]=bin.charCodeAt(i);
+    
+    // HMAC-SHA256
+    const key=await crypto.subtle.importKey('raw',secretBytes,
+      {name:'HMAC',hash:'SHA-256'},false,['sign']);
+    const sigBytes=await crypto.subtle.sign('HMAC',key,new TextEncoder().encode(message));
+    
+    // Converter para base64url (sem padding, com - e _)
+    let sigB64=btoa(String.fromCharCode(...new Uint8Array(sigBytes)));
+    sigB64=sigB64.replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+    
     return{
       'POLY_ADDRESS':_polyApiCreds.walletAddress,
       'POLY_SIGNATURE':sigB64,
       'POLY_TIMESTAMP':ts,
       'POLY_API_KEY':_polyApiCreds.apiKey,
-      'POLY_PASSPHRASE':_polyApiCreds.passphrase,
-      'Content-Type':'application/json'
+      'POLY_PASSPHRASE':_polyApiCreds.passphrase
     };
-  }catch(e){log('L2 erro: '+e.message,'w');return null;}
+  }catch(e){
+    log('L2 headers erro: '+e.message,'w');
+    return null;
+  }
 }
 
-// Executar ordem real na Polymarket
+// ── Executar ordem REAL na Polymarket ──
 async function polyPlaceOrder(tokenId,side,price,sizeUSDC){
   if(!_polyApiCreds){
+    log('⚠ Sem credenciais — autenticando...','w');
     const ok=await polyDeriveCredentials();
-    if(!ok)return null;
+    if(!ok){log('❌ Falha autenticação, abortando ordem','e');return null;}
   }
   try{
     const funder=_polyApiCreds.funder;
     const wallet=_polyApiCreds.wallet;
+    
+    // Calcular size (shares)
     const size=parseFloat((sizeUSDC/price).toFixed(2));
-    const ts=String(Math.floor(Date.now()/1000));
-    const makerAmount=Math.round(sizeUSDC*1e6);
-    const takerAmount=Math.round(size*1e6);
+    if(size<5){
+      log('⚠ Tamanho mínimo Polymarket: 5 shares (você tem '+size+')','w');
+      return null;
+    }
+    
+    log('📤 Preparando ordem: '+side+' '+Math.round(price*100)+'¢ · $'+sizeUSDC+' ('+size+' shares) · token:'+tokenId.slice(0,14)+'...','i');
+    
+    // EIP-712 Order signing
+    const makerAmount=Math.round(sizeUSDC*1e6); // USDC 6 decimais
+    const takerAmount=Math.round(size*1e6);     // shares 6 decimais
     const salt=Math.floor(Math.random()*1e15);
+    const tsOrder=String(Math.floor(Date.now()/1000));
     
-    // Assinar ordem EIP-712
-    const domain={name:'CTFExchange',version:'1',chainId:POLY_CHAIN,
-      verifyingContract:'0x4bFb41d5B3570DeFd03C39a9A4D8dE6Bd8B8982E'};
-    const types={Order:[
-      {name:'salt',type:'uint256'},{name:'maker',type:'address'},
-      {name:'signer',type:'address'},{name:'taker',type:'address'},
-      {name:'tokenId',type:'uint256'},{name:'makerAmount',type:'uint256'},
-      {name:'takerAmount',type:'uint256'},{name:'expiration',type:'uint256'},
-      {name:'nonce',type:'uint256'},{name:'feeRateBps',type:'uint256'},
-      {name:'side',type:'uint8'},{name:'signatureType',type:'uint8'}
-    ]};
+    const domain={
+      name:'CTF Exchange',
+      version:'1',
+      chainId:POLY_CHAIN,
+      verifyingContract:'0x4bFb41d5B3570DeFd03C39a9A4D8dE6Bd8B8982E'
+    };
+    const types={
+      Order:[
+        {name:'salt',type:'uint256'},
+        {name:'maker',type:'address'},
+        {name:'signer',type:'address'},
+        {name:'taker',type:'address'},
+        {name:'tokenId',type:'uint256'},
+        {name:'makerAmount',type:'uint256'},
+        {name:'takerAmount',type:'uint256'},
+        {name:'expiration',type:'uint256'},
+        {name:'nonce',type:'uint256'},
+        {name:'feeRateBps',type:'uint256'},
+        {name:'side',type:'uint8'},
+        {name:'signatureType',type:'uint8'}
+      ]
+    };
     const orderValue={
-      salt:salt,maker:funder,signer:wallet.address,
+      salt:salt,
+      maker:funder,
+      signer:wallet.address,
       taker:'0x0000000000000000000000000000000000000000',
-      tokenId:BigInt(tokenId),makerAmount:makerAmount,takerAmount:takerAmount,
-      expiration:0,nonce:parseInt(ts),feeRateBps:0,
-      side:side==='BUY'?0:1,signatureType:1
+      tokenId:tokenId,
+      makerAmount:String(makerAmount),
+      takerAmount:String(takerAmount),
+      expiration:'0',
+      nonce:'0',
+      feeRateBps:'0',
+      side:side==='BUY'?0:1,
+      signatureType:1 // Magic/Email wallet
     };
+    
+    log('🔏 Assinando ordem EIP-712...','i');
     const orderSig=await wallet._signTypedData(domain,types,orderValue);
+    log('✓ Ordem assinada','i');
     
-    const orderBody={
-      orderType:'FOK',tokenID:tokenId,side,price,size,
-      feeRateBps:'0',nonce:ts,expiration:'0',
-      maker:funder,signer:wallet.address,
+    // Payload da ordem
+    const orderPayload={
+      salt:String(salt),
+      maker:funder,
+      signer:wallet.address,
       taker:'0x0000000000000000000000000000000000000000',
-      signatureType:1,signature:orderSig,
-      salt:String(salt),makerAmount:String(makerAmount),takerAmount:String(takerAmount)
+      tokenId:tokenId,
+      makerAmount:String(makerAmount),
+      takerAmount:String(takerAmount),
+      expiration:'0',
+      nonce:'0',
+      feeRateBps:'0',
+      side:side==='BUY'?'BUY':'SELL',
+      signatureType:1,
+      signature:orderSig
     };
     
-    const bodyStr=JSON.stringify({order:orderBody,owner:funder});
-    const headers=await polyL2Headers('POST','/order',bodyStr);
-    if(!headers)throw new Error('L2 headers falhou');
+    const bodyObj={
+      order:orderPayload,
+      owner:_polyApiCreds.apiKey,
+      orderType:'FOK' // Fill or Kill - executa imediatamente
+    };
+    const bodyStr=JSON.stringify(bodyObj);
     
-    log(`📤 Ordem: ${side} ${Math.round(price*100)}¢ · $${sizeUSDC} · tokenId:${tokenId.slice(0,16)}`,'i');
+    const headers=await polyL2Headers('POST','/order',bodyStr);
+    if(!headers){log('❌ Falha ao gerar L2 headers','e');return null;}
+    headers['Content-Type']='application/json';
+    
+    log('📡 Enviando ordem para Polymarket...','i');
     const res=await fetch(POLY_HOST+'/order',{method:'POST',headers,body:bodyStr});
     const txt=await res.text();
-    log(`📥 HTTP ${res.status}: ${txt.slice(0,200)}`,'i');
-    let result;try{result=JSON.parse(txt);}catch(e){result={};}
+    log('📥 HTTP '+res.status+': '+txt.slice(0,250),'i');
     
-    if(res.ok&&(result.success||result.orderId||result.orderID||result.transactionHash)){
-      log(`✅ ORDEM REAL · ${side} ${Math.round(price*100)}¢ · $${sizeUSDC}`,'s');
+    let result;
+    try{result=JSON.parse(txt);}catch(e){result={error:txt};}
+    
+    if(res.ok&&(result.success||result.orderID||result.orderId||result.transactionHash)){
+      log('✅ ORDEM REAL EXECUTADA · '+side+' '+Math.round(price*100)+'¢ · $'+sizeUSDC+' · ID:'+(result.orderID||result.orderId||'').slice(0,14),'s');
       return result;
     }else{
-      log(`❌ Ordem rejeitada (${res.status}): ${JSON.stringify(result).slice(0,150)}`,'e');
+      log('❌ Ordem rejeitada ('+res.status+'): '+JSON.stringify(result).slice(0,180),'e');
       return null;
     }
   }catch(e){
-    log(`❌ polyPlaceOrder erro: ${e.message}`,'e');
+    log('❌ polyPlaceOrder erro: '+e.message,'e');
     return null;
   }
 }
@@ -1798,30 +1858,61 @@ async function polyDeriveCredentials(){
   }
 }
 
-// ── Saldo via Polygon RPC ──
+// ── Saldo USDC — L2 auth via balance-allowance ──
 async function polyGetBalance(){
   try{
+    let cash=0, bets=0;
+    
+    // 1. USDC livre — endpoint autenticado L2
+    if(_polyApiCreds){
+      try{
+        const path='/balance-allowance?asset_type=COLLATERAL';
+        const headers=await polyL2Headers('GET',path,'');
+        if(headers){
+          headers['Content-Type']='application/json';
+          const r=await fetch(POLY_HOST+path,{method:'GET',headers});
+          log('balance-allowance HTTP '+r.status,'i');
+          if(r.ok){
+            const d=await r.json();
+            log('balance: '+JSON.stringify(d).slice(0,150),'i');
+            let raw=parseFloat(d.balance||d.allowance||0);
+            // Se for micro-USDC (6 decimais), converter
+            if(raw>1000)raw=raw/1e6;
+            cash=raw;
+          }else{
+            const t=await r.text();
+            log('balance erro: '+t.slice(0,100),'w');
+          }
+        }
+      }catch(e){log('balance exception: '+e.message,'w');}
+    }
+    
+    // 2. Posições abertas — data-api público
     const funder=(gv('apiFunder')||'').trim();
     const walletAddr=_polyApiCreds?_polyApiCreds.walletAddress:'';
-    const addrs=[...new Set([funder,walletAddr].filter(a=>a&&a.startsWith('0x')))];
-    // data-api positions value
-    for(const addr of addrs){
+    for(const addr of [...new Set([funder,walletAddr].filter(a=>a&&a.startsWith('0x')))]){
       try{
         const r=await fetch('https://data-api.polymarket.com/value?user='+addr);
         if(r.ok){
           const d=await r.json();
           const arr=Array.isArray(d)?d:[d];
-          const bets=parseFloat(arr[0]?.value||0);
-          const manual=parseFloat(localStorage.getItem('_manualBalance')||'0');
-          const cash=manual>0?manual:0;
-          if(bets>0||cash>0)return{cash,bets,total:cash+bets};
+          const v=parseFloat(arr[0]?.value||0);
+          if(v>0){bets=v;break;}
         }
       }catch(e){}
     }
-    const manual=parseFloat(localStorage.getItem('_manualBalance')||'0');
-    if(manual>0)return{cash:manual,bets:0,total:manual};
+    
+    // 3. Fallback saldo manual se nada encontrado
+    if(cash===0&&bets===0){
+      const manual=parseFloat(localStorage.getItem('_manualBalance')||'0');
+      if(manual>0)cash=manual;
+    }
+    
+    return{cash,bets,total:cash+bets};
+  }catch(e){
+    log('getBalance erro: '+e.message,'w');
     return{cash:0,bets:0,total:0};
-  }catch(e){return{cash:0,bets:0,total:0};}
+  }
 }
 
 // ── Display de saldo ──
@@ -1842,20 +1933,7 @@ function updBalanceDisplay(cash,bets,total){
 }
 
 // ── checkPolyBalance ──
-async function checkPolyBalance(){
-  if(!apiConfigured())return;
-  if(!_polyApiCreds){const ok=await polyDeriveCredentials();if(!ok)return;}
-  const bal=await polyGetBalance();
-  if(bal){
-    const{cash,bets,total}=bal;
-    log('💰 Saldo: $'+cash.toFixed(2)+' disponível · $'+bets.toFixed(2)+' apostas · Total $'+total.toFixed(2),'i');
-    const el=g('apiStatus');if(el)el.textContent='✅ Conectado · $'+cash.toFixed(2)+' disponível';
-    updBalanceDisplay(cash,bets,total);
-    drawBalChart&&drawBalChart();
-  }else{
-    updBalanceDisplay(null,null,null);
-  }
-}
+
 
 // ── updPolyDisplay ──
 function updPolyDisplay(){
@@ -2334,23 +2412,7 @@ function updAPI(){
 
 // Atualizar saldo a cada 30s quando API configurada (só se autenticado)
 setInterval(()=>{if(apiConfigured()&&_polyApiCreds&&!_polyAuthFailed)checkPolyBalance();},30000);
-function validatePrivKey(el){
-  let v=el.value.trim().replace(/\s+/g,'');
-  if(!v){g('privKeyHint').style.display='none';return;}
-  if(v.startsWith('0x')||v.startsWith('0X'))v=v.slice(2);
-  const hint=g('privKeyHint');
-  hint.style.display='block';
-  if(/^[0-9a-fA-F]{64}$/.test(v)){
-    hint.textContent='✓ Formato válido ('+v.length+' chars hex)';
-    hint.style.color='var(--up)';
-  } else if(/^[0-9a-fA-F]+$/.test(v)){
-    hint.textContent='✗ '+v.length+' chars hex — esperado 64';
-    hint.style.color='var(--dn)';
-  } else {
-    hint.textContent='✗ Contém caracteres inválidos';
-    hint.style.color='var(--dn)';
-  }
-}
+
 ['apiPrivKey','apiFunder'].forEach(id=>{const el=g(id);if(el)el.addEventListener('input',()=>{_polyAuthFailed=false;updAPI();saveConfig();if(apiConfigured())setTimeout(checkPolyBalance,500);});});
 
 // ── Bot Control ──
