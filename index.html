@@ -536,7 +536,7 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
 
 <div id="loginScreen">
   <div class="login-box">
-    <div class="login-brand">MASTER<em>BOT</em><sup>v6.7</sup></div>
+    <div class="login-brand">MASTER<em>BOT</em><sup>v6.8</sup></div>
     <div class="login-sub">Acesso Restrito · Trading Platform</div>
     <div class="login-field">
       <label>Login</label>
@@ -554,7 +554,7 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
 <div id="appContent">
 <!-- ═══ TOPBAR ═══ -->
 <div class="topbar">
-  <div class="brand">MASTER<em>BOT</em><sup>v6.7</sup></div>
+  <div class="brand">MASTER<em>BOT</em><sup>v6.8</sup></div>
   <div class="chips" id="chips">
     <div class="chip active" data-sym="BTCUSDT" data-lbl="BTC">BTC</div>
     <div class="chip" data-sym="ETHUSDT" data-lbl="ETH">ETH</div>
@@ -1629,7 +1629,13 @@ async function fetchPolyPrices(){
 async function polyL2Headers(method,requestPath,body=''){
   if(!_polyApiCreds)return null;
   try{
-    const ts=String(Math.floor(Date.now()/1000));
+    // Usar timestamp do servidor se disponível (evitar desync de relógio)
+    let ts;
+    try{
+      const tr=await fetch(POLY_HOST+'/time',{signal:AbortSignal.timeout(2000)});
+      if(tr.ok){const td=await tr.json();ts=String(Math.round(td.time||td.timestamp||Date.now()/1000));}
+    }catch(e){}
+    if(!ts)ts=String(Math.floor(Date.now()/1000));
     const bodyStr=typeof body==='string'?body:(body?JSON.stringify(body):'');
     const message=ts+method.toUpperCase()+requestPath+bodyStr;
     
@@ -1650,12 +1656,15 @@ async function polyL2Headers(method,requestPath,body=''){
     sigB64=sigB64.replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
     log('🔐 L2: ts='+ts+' msg='+message.slice(0,60)+' sig='+sigB64.slice(0,20),'i');
     
+    // POLY_ADDRESS = endereço do signer (EOA da private key)
+    // Para Magic Wallet: o signer é o EOA, o funder é o proxy/profile
     return{
       'POLY_ADDRESS':_polyApiCreds.walletAddress,
       'POLY_SIGNATURE':sigB64,
       'POLY_TIMESTAMP':ts,
       'POLY_API_KEY':_polyApiCreds.apiKey,
-      'POLY_PASSPHRASE':_polyApiCreds.passphrase
+      'POLY_PASSPHRASE':_polyApiCreds.passphrase,
+      'Content-Type':'application/json'
     };
   }catch(e){
     log('L2 headers erro: '+e.message,'w');
