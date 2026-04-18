@@ -536,7 +536,7 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
 
 <div id="loginScreen">
   <div class="login-box">
-    <div class="login-brand">MASTER<em>BOT</em><sup>v6.2</sup></div>
+    <div class="login-brand">MASTER<em>BOT</em><sup>v6.3</sup></div>
     <div class="login-sub">Acesso Restrito · Trading Platform</div>
     <div class="login-field">
       <label>Login</label>
@@ -554,7 +554,7 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
 <div id="appContent">
 <!-- ═══ TOPBAR ═══ -->
 <div class="topbar">
-  <div class="brand">MASTER<em>BOT</em><sup>v6.2</sup></div>
+  <div class="brand">MASTER<em>BOT</em><sup>v6.3</sup></div>
   <div class="chips" id="chips">
     <div class="chip active" data-sym="BTCUSDT" data-lbl="BTC">BTC</div>
     <div class="chip" data-sym="ETHUSDT" data-lbl="ETH">ETH</div>
@@ -1534,104 +1534,86 @@ async function fetchPolyPrices(){
   if(P.fetching)return;
   P.fetching=true;
   try{
-    const now=Date.now();
-    // Buscar eventos BTC com mercados filhos — mais completo que /markets
-    const evUrl='https://gamma-api.polymarket.com/events?active=true&closed=false&limit=30&q=BTC';
-    const r1=await fetch(evUrl);
-    if(!r1.ok)throw new Error('gamma events '+r1.status);
-    const events=await r1.json();
+    // Slug determinístico: btc-updown-5m-{window_timestamp}
+    // window_ts = floor(now/300)*300 (períodos de 5min alinhados ao Unix epoch)
+    const nowSec=Math.floor(Date.now()/1000);
+    const windowTs=nowSec-(nowSec%300);
+    const slug=`btc-updown-5m-${windowTs}`;
     
-    // Extrair todos os markets de todos os eventos BTC
-    let allMarkets=[];
-    for(const ev of events){
-      const mks=ev.markets||[];
-      allMarkets.push(...mks);
-    }
-    // Também buscar diretamente
-    const r2=await fetch('https://gamma-api.polymarket.com/markets?active=true&closed=false&limit=50&q=BTC');
-    if(r2.ok){const d2=await r2.json();allMarkets.push(...d2);}
+    // Tentar slug atual primeiro, depois slug anterior (mercado pode não ter aberto ainda)
+    const slugs=[slug, `btc-updown-5m-${windowTs-300}`];
+    let market=null;
     
-    log('🔍 Poly: '+allMarkets.length+' mercados BTC | '+allMarkets.slice(0,4).map(m=>(m.question||m.groupItemTitle||m.slug||'?').slice(0,30)).join(' | '),'i');
-    
-    // Filtrar 5min — aceitar qualquer variação de título
-    const btc5min=allMarkets.filter(m=>{
-      const q=(m.question||m.groupItemTitle||m.title||m.slug||'').toLowerCase();
-      const hasBtc=q.includes('btc')||q.includes('bitcoin');
-      const has5=q.includes('5') && (q.includes('min')||q.includes('minut'));
-      return hasBtc&&has5;
-    });
-    
-    // Fallback: qualquer mercado BTC ativo
-    const pool=btc5min.length?btc5min:allMarkets.filter(m=>{
-      const q=(m.question||m.groupItemTitle||m.slug||'').toLowerCase();
-      return q.includes('btc')||q.includes('bitcoin');
-    });
-    
-    if(!pool.length){
-      P.error='Sem mercado BTC';
-      P.fetching=false;updPolyDisplay();return;
+    for(const s of slugs){
+      try{
+        const r=await fetch(`https://gamma-api.polymarket.com/markets?slug=${s}`);
+        if(r.ok){
+          const d=await r.json();
+          const arr=Array.isArray(d)?d:[d];
+          if(arr.length&&arr[0].clobTokenIds){
+            market=arr[0];
+            log('✓ Mercado: '+s+' | '+market.question,'i');
+            break;
+          }
+        }
+      }catch(e){}
     }
     
-    // Pegar o que fecha mais próximo do futuro (período atual)
-    const market=pool.sort((a,b)=>{
-      const ea=new Date(a.endDate||a.end_date||a.endDateIso||0).getTime();
-      const eb=new Date(b.endDate||b.end_date||b.endDateIso||0).getTime();
-      if(!ea&&!eb)return 0;
-      if(!ea)return 1;if(!eb)return -1;
-      const da=Math.abs(ea-now),db=Math.abs(eb-now);
-      return da-db;
-    })[0];
-    
-    P.marketSlug=market.slug||market.conditionId;
-    P.marketEnd=new Date(market.endDate||market.end_date||market.endDateIso||0).getTime();
-    P.error=null;
-    log('✓ Mercado: '+(market.question||market.slug||'?')+' | tokens: '+JSON.stringify((market.tokens||market.outcomes||[]).map(t=>({n:t.outcome||t.title||t.name,id:(t.token_id||t.tokenId||'').slice(0,12)}))).slice(0,200),'i');
-    
-    // 2. Extrair token IDs — múltiplos formatos possíveis
-    const tokens=market.tokens||market.outcomes||[];
-    // clobTokenIds pode ser array direto de IDs [upId, downId]
-    const clobIds=market.clobTokenIds||market.clob_token_ids||[];
-    
-    if(tokens.length){
-      for(const t of tokens){
-        const name=(t.outcome||t.title||t.name||'').toUpperCase();
-        const id=t.token_id||t.tokenId||t.clobTokenId||t.id||'';
-        if(name.includes('UP')||name.includes('CIMA')||name.includes('YES')||name==='YES'){
-          P.upTokenId=id;
-        }else if(name.includes('DOWN')||name.includes('BAIXO')||name.includes('NO')||name==='NO'){
-          P.dnTokenId=id;
+    // Fallback: buscar por query
+    if(!market){
+      const r=await fetch('https://gamma-api.polymarket.com/markets?active=true&closed=false&limit=30&q=BTC+Up+or+Down');
+      if(r.ok){
+        const d=await r.json();
+        const now=Date.now();
+        const pool=d.filter(m=>m.clobTokenIds&&m.clobTokenIds.length>=2);
+        if(pool.length){
+          market=pool.sort((a,b)=>{
+            const ea=new Date(a.endDate||0).getTime();
+            const eb=new Date(b.endDate||0).getTime();
+            return Math.abs(ea-now)-Math.abs(eb-now);
+          })[0];
+          log('✓ Mercado (fallback): '+market.question,'i');
         }
       }
     }
-    // Fallback: clobTokenIds[0]=YES/UP, clobTokenIds[1]=NO/DOWN
-    if(!P.upTokenId&&clobIds.length>=1)P.upTokenId=clobIds[0];
-    if(!P.dnTokenId&&clobIds.length>=2)P.dnTokenId=clobIds[1];
+    
+    if(!market){
+      P.error='Mercado BTC 5min não encontrado';
+      P.fetching=false;updPolyDisplay();return;
+    }
+    
+    // Extrair token IDs — clobTokenIds[0]=UP, clobTokenIds[1]=DOWN
+    const ids=market.clobTokenIds||[];
+    P.upTokenId=ids[0]||null;
+    P.dnTokenId=ids[1]||null;
+    P.marketSlug=market.slug||slug;
+    P.marketEnd=new Date(market.endDate||0).getTime();
+    P.error=null;
     
     log('🎯 TokenIDs: UP='+( P.upTokenId?P.upTokenId.slice(0,16):'NONE')+' DN='+(P.dnTokenId?P.dnTokenId.slice(0,16):'NONE'),'i');
     
-    // 3. Buscar preços via CLOB midpoint
+    // Buscar preços via CLOB
     if(P.upTokenId){
       try{
-        const r2=await fetch(`https://clob.polymarket.com/midpoint?token_id=${P.upTokenId}`);
-        if(r2.ok){const d=await r2.json();P.upPrice=parseFloat(d.mid)||null;}
+        const r=await fetch(`https://clob.polymarket.com/midpoint?token_id=${P.upTokenId}`);
+        if(r.ok){const d=await r.json();P.upPrice=parseFloat(d.mid)||null;}
       }catch(e){}
     }
     if(P.dnTokenId){
       try{
-        const r3=await fetch(`https://clob.polymarket.com/midpoint?token_id=${P.dnTokenId}`);
-        if(r3.ok){const d=await r3.json();P.dnPrice=parseFloat(d.mid)||null;}
+        const r=await fetch(`https://clob.polymarket.com/midpoint?token_id=${P.dnTokenId}`);
+        if(r.ok){const d=await r.json();P.dnPrice=parseFloat(d.mid)||null;}
       }catch(e){}
     }
-    
-    // Se temos upPrice mas não dnPrice, calcular
     if(P.upPrice&&!P.dnPrice)P.dnPrice=parseFloat((1-P.upPrice).toFixed(4));
     if(P.dnPrice&&!P.upPrice)P.upPrice=parseFloat((1-P.dnPrice).toFixed(4));
     
     P.lastFetch=Date.now();
-    log(`📡 Polymarket: UP ${P.upPrice?Math.round(P.upPrice*100)+'¢':'—'} · DN ${P.dnPrice?Math.round(P.dnPrice*100)+'¢':'—'} · ${market.question||market.title||''}`.slice(0,120),'i');
+    log(`📡 Poly: UP ${P.upPrice?Math.round(P.upPrice*100)+'¢':'—'} · DN ${P.dnPrice?Math.round(P.dnPrice*100)+'¢':'—'}`,'i');
     
   }catch(e){
     P.error=e.message;
+    log('fetchPolyPrices erro: '+e.message,'w');
   }
   P.fetching=false;
   updPolyDisplay();
