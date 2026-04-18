@@ -536,7 +536,7 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
 
 <div id="loginScreen">
   <div class="login-box">
-    <div class="login-brand">MASTER<em>BOT</em><sup>v6.8</sup></div>
+    <div class="login-brand">MASTER<em>BOT</em><sup>v6.9</sup></div>
     <div class="login-sub">Acesso Restrito · Trading Platform</div>
     <div class="login-field">
       <label>Login</label>
@@ -554,7 +554,7 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
 <div id="appContent">
 <!-- ═══ TOPBAR ═══ -->
 <div class="topbar">
-  <div class="brand">MASTER<em>BOT</em><sup>v6.8</sup></div>
+  <div class="brand">MASTER<em>BOT</em><sup>v6.9</sup></div>
   <div class="chips" id="chips">
     <div class="chip active" data-sym="BTCUSDT" data-lbl="BTC">BTC</div>
     <div class="chip" data-sym="ETHUSDT" data-lbl="ETH">ETH</div>
@@ -1845,16 +1845,32 @@ async function polyDeriveCredentials(){
     log('✓ Assinatura OK — buscando credenciais...','i');
     const funder=(gv('apiFunder')||'').trim()||wallet.address;
     const authHeaders={'POLY_ADDRESS':wallet.address,'POLY_SIGNATURE':sig,'POLY_TIMESTAMP':ts,'POLY_NONCE':String(nonce),'Content-Type':'application/json'};
-    // Tentar GET (deriva existente) primeiro
-    let credsRes=await fetch(`${POLY_HOST}/auth/derive-api-key`,{method:'GET',headers:authHeaders});
-    log('derive-api-key: HTTP '+credsRes.status,'i');
+    
+    // Estratégia: deletar chave existente e criar nova
+    // Isso garante que temos o secret correto
+    log('🔑 Deletando chave existente...','i');
+    try{
+      await fetch(`${POLY_HOST}/auth/api-key`,{method:'DELETE',headers:authHeaders});
+      log('🔑 Chave deletada (ou não existia)','i');
+    }catch(e){log('Delete ignorado: '+e.message,'i');}
+    
+    // Criar nova chave
+    log('🔑 Criando nova chave...','i');
+    let credsRes=await fetch(`${POLY_HOST}/auth/api-key`,{method:'POST',headers:authHeaders,body:JSON.stringify({})});
+    log('create-api-key: HTTP '+credsRes.status,'i');
+    
     if(!credsRes.ok){
-      if(credsRes.status===404||credsRes.status===400){
-        credsRes=await fetch(`${POLY_HOST}/auth/api-key`,{method:'POST',headers:authHeaders,body:JSON.stringify({})});
-      }
+      // Se falhou, tentar derivar
+      log('POST falhou, tentando GET derive...','i');
+      credsRes=await fetch(`${POLY_HOST}/auth/derive-api-key`,{method:'GET',headers:authHeaders});
+      log('derive-api-key: HTTP '+credsRes.status,'i');
       if(!credsRes.ok){const t=await credsRes.text();throw new Error('HTTP '+credsRes.status+' — '+t.slice(0,120));}
     }
     const creds=await credsRes.json();
+    if(creds.apiKey||creds.key){
+      log('🔑 Nova chave: '+(creds.apiKey||creds.key).slice(0,12)+'...','s');
+      log('🔑 Secret: '+creds.secret?.slice(0,12)+'...','s');
+    }
     log('📦 Resposta: '+JSON.stringify(creds).slice(0,80),'i');
     if(!creds.apiKey&&!creds.key)throw new Error('Sem apiKey na resposta');
     _polyApiCreds={apiKey:creds.apiKey||creds.key,secret:creds.secret,passphrase:creds.passphrase,walletAddress:wallet.address,funder,wallet};
