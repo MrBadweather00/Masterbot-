@@ -536,7 +536,7 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
 
 <div id="loginScreen">
   <div class="login-box">
-    <div class="login-brand">MASTER<em>BOT</em><sup>v6.4</sup></div>
+    <div class="login-brand">MASTER<em>BOT</em><sup>v6.5</sup></div>
     <div class="login-sub">Acesso Restrito · Trading Platform</div>
     <div class="login-field">
       <label>Login</label>
@@ -554,7 +554,7 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
 <div id="appContent">
 <!-- ═══ TOPBAR ═══ -->
 <div class="topbar">
-  <div class="brand">MASTER<em>BOT</em><sup>v6.4</sup></div>
+  <div class="brand">MASTER<em>BOT</em><sup>v6.5</sup></div>
   <div class="chips" id="chips">
     <div class="chip active" data-sym="BTCUSDT" data-lbl="BTC">BTC</div>
     <div class="chip" data-sym="ETHUSDT" data-lbl="ETH">ETH</div>
@@ -1738,6 +1738,206 @@ async function checkPolyBalance(){
     const el=g('apiStatus');if(el)el.textContent='✅ Conectado · saldo indisponível';
     updBalanceDisplay(null,null,null);
   }
+}
+
+
+// ════════════════════════════════════════════════════════
+// POLYMARKET — Estado e constantes
+// ════════════════════════════════════════════════════════
+const POLY_HOST='https://clob.polymarket.com';
+const POLY_CHAIN=137;
+let _polyApiCreds=null;
+let _polyAuthFailed=false;
+
+// ── Derivar credenciais L1→L2 ──
+async function polyDeriveCredentials(){
+  try{
+    let pk=(gv('apiPrivKey')||'').trim().replace(/[\s\n\r\t]/g,'');
+    if(!pk)throw new Error('Private Key não preenchida');
+    log('🔍 Chave: '+pk.length+' chars, começa com "'+pk.slice(0,4)+'", termina com "'+pk.slice(-4)+'"','i');
+    const pkClean=pk.startsWith('0x')||pk.startsWith('0X')?pk.slice(2):pk;
+    if(pkClean.length!==64)throw new Error('Tamanho incorreto: '+pkClean.length+' (esperado 64)');
+    if(!/^[0-9a-fA-F]{64}$/.test(pkClean))throw new Error('Caracteres inválidos na chave');
+    const pkFinal='0x'+pkClean;
+    log('🔑 Formato OK — criando wallet...','i');
+    const wallet=new ethers.Wallet(pkFinal);
+    const ts=String(Math.floor(Date.now()/1000));
+    const nonce=0;
+    const domain={name:'ClobAuthDomain',version:'1',chainId:POLY_CHAIN};
+    const types={ClobAuth:[
+      {name:'address',type:'address'},{name:'timestamp',type:'string'},
+      {name:'nonce',type:'uint256'},{name:'message',type:'string'}
+    ]};
+    const msgValue={address:wallet.address,timestamp:ts,nonce,message:'This message attests that I control the given wallet'};
+    log('🔏 Assinando EIP-712...','i');
+    const sig=await wallet._signTypedData(domain,types,msgValue);
+    log('✓ Assinatura OK — buscando credenciais...','i');
+    const funder=(gv('apiFunder')||'').trim()||wallet.address;
+    const authHeaders={'POLY_ADDRESS':wallet.address,'POLY_SIGNATURE':sig,'POLY_TIMESTAMP':ts,'POLY_NONCE':String(nonce),'Content-Type':'application/json'};
+    // Tentar GET (deriva existente) primeiro
+    let credsRes=await fetch(`${POLY_HOST}/auth/derive-api-key`,{method:'GET',headers:authHeaders});
+    log('derive-api-key: HTTP '+credsRes.status,'i');
+    if(!credsRes.ok){
+      if(credsRes.status===404||credsRes.status===400){
+        credsRes=await fetch(`${POLY_HOST}/auth/api-key`,{method:'POST',headers:authHeaders,body:JSON.stringify({})});
+      }
+      if(!credsRes.ok){const t=await credsRes.text();throw new Error('HTTP '+credsRes.status+' — '+t.slice(0,120));}
+    }
+    const creds=await credsRes.json();
+    log('📦 Resposta: '+JSON.stringify(creds).slice(0,80),'i');
+    if(!creds.apiKey&&!creds.key)throw new Error('Sem apiKey na resposta');
+    _polyApiCreds={apiKey:creds.apiKey||creds.key,secret:creds.secret,passphrase:creds.passphrase,walletAddress:wallet.address,funder,wallet};
+    log('✅ Polymarket autenticado · '+wallet.address.slice(0,10)+'...','s');
+    updAPI();
+    setTimeout(fetchPolyPrices,500);
+    return true;
+  }catch(e){
+    _polyAuthFailed=true;
+    log('❌ Auth Polymarket falhou: '+e.message,'e');
+    _polyApiCreds=null;return false;
+  }
+}
+
+// ── Saldo via Polygon RPC ──
+async function polyGetBalance(){
+  try{
+    const funder=(gv('apiFunder')||'').trim();
+    const walletAddr=_polyApiCreds?_polyApiCreds.walletAddress:'';
+    const addrs=[...new Set([funder,walletAddr].filter(a=>a&&a.startsWith('0x')))];
+    // data-api positions value
+    for(const addr of addrs){
+      try{
+        const r=await fetch('https://data-api.polymarket.com/value?user='+addr);
+        if(r.ok){
+          const d=await r.json();
+          const arr=Array.isArray(d)?d:[d];
+          const bets=parseFloat(arr[0]?.value||0);
+          const manual=parseFloat(localStorage.getItem('_manualBalance')||'0');
+          const cash=manual>0?manual:0;
+          if(bets>0||cash>0)return{cash,bets,total:cash+bets};
+        }
+      }catch(e){}
+    }
+    const manual=parseFloat(localStorage.getItem('_manualBalance')||'0');
+    if(manual>0)return{cash:manual,bets:0,total:manual};
+    return{cash:0,bets:0,total:0};
+  }catch(e){return{cash:0,bets:0,total:0};}
+}
+
+// ── Display de saldo ──
+function updBalanceDisplay(cash,bets,total){
+  const el=g('polyBalanceDisplay');
+  if(!el)return;
+  if(cash===null){el.innerHTML='<span style="color:var(--txt3)">Saldo indisponível</span>';return;}
+  el.innerHTML=`<div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+    <div><div style="font-family:'JetBrains Mono',monospace;font-size:7px;color:var(--txt3);margin-bottom:2px">DISPONÍVEL</div>
+    <div style="font-family:'Bebas Neue',sans-serif;font-size:22px;color:var(--up);line-height:1">${cash.toFixed(2)}</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:7px;color:var(--txt3)">USDC</div></div>
+    ${bets>0?`<div><div style="font-family:'JetBrains Mono',monospace;font-size:7px;color:var(--txt3);margin-bottom:2px">EM APOSTAS</div>
+    <div style="font-family:'Bebas Neue',sans-serif;font-size:22px;color:var(--gold);line-height:1">${bets.toFixed(2)}</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:7px;color:var(--txt3)">USDC</div></div>`:''}
+    <div><div style="font-family:'JetBrains Mono',monospace;font-size:7px;color:var(--txt3);margin-bottom:2px">TOTAL</div>
+    <div style="font-family:'Bebas Neue',sans-serif;font-size:22px;color:var(--white);line-height:1">${total.toFixed(2)}</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:7px;color:var(--txt3)">USDC</div></div></div>`;
+}
+
+// ── checkPolyBalance ──
+async function checkPolyBalance(){
+  if(!apiConfigured())return;
+  if(!_polyApiCreds){const ok=await polyDeriveCredentials();if(!ok)return;}
+  const bal=await polyGetBalance();
+  if(bal){
+    const{cash,bets,total}=bal;
+    log('💰 Saldo: $'+cash.toFixed(2)+' disponível · $'+bets.toFixed(2)+' apostas · Total $'+total.toFixed(2),'i');
+    const el=g('apiStatus');if(el)el.textContent='✅ Conectado · $'+cash.toFixed(2)+' disponível';
+    updBalanceDisplay(cash,bets,total);
+    drawBalChart&&drawBalChart();
+  }else{
+    updBalanceDisplay(null,null,null);
+  }
+}
+
+// ── updPolyDisplay ──
+function updPolyDisplay(){
+  ['u','d'].forEach(s=>{
+    const price=s==='u'?P.upPrice:P.dnPrice;
+    const el=g('polyPrice'+s.toUpperCase());
+    if(!el)return;
+    if(price===null){el.textContent='Poly: —¢';el.style.color='var(--txt3)';}
+    else{
+      const cents=Math.round(price*100);
+      const mn=gf(s==='u'?'tminU':'tminD'),mx=gf(s==='u'?'tmaxU':'tmaxD');
+      const inRange=!isNaN(mn)&&!isNaN(mx)&&price>=mn&&price<=mx;
+      el.textContent='Poly: '+cents+'¢';
+      el.style.color=inRange?'var(--up)':'var(--dn)';
+    }
+  });
+  // BUY UP/DN buttons
+  const ref=E.periodRef;
+  const buyUp=g('polyBuyUp'),buyDn=g('polyBuyDn');
+  if(buyUp){
+    const p=P.upPrice;
+    if(p!==null){
+      const cents=Math.round(p*100);
+      const mn=gf('tminU'),mx=gf('tmaxU');
+      const ok=!isNaN(mn)&&!isNaN(mx)&&p>=mn&&p<=mx;
+      buyUp.textContent=cents+'¢';buyUp.style.color=ok?'var(--up)':'var(--txt3)';
+      buyUp.parentElement.style.opacity=ok?'1':'0.4';
+    }else if(ref&&E.price){
+      const est=Math.max(0.01,Math.min(0.99,0.5+(E.price-ref)/ref*450));
+      buyUp.textContent=Math.round(est*100)+'¢*';
+      buyUp.parentElement.style.opacity='0.6';
+    }else buyUp.textContent='—¢';
+  }
+  if(buyDn){
+    const p=P.dnPrice;
+    if(p!==null){
+      const cents=Math.round(p*100);
+      const mn=gf('tminD'),mx=gf('tmaxD');
+      const ok=!isNaN(mn)&&!isNaN(mx)&&p>=mn&&p<=mx;
+      buyDn.textContent=cents+'¢';buyDn.style.color=ok?'var(--dn)':'var(--txt3)';
+      buyDn.parentElement.style.opacity=ok?'1':'0.4';
+    }else if(ref&&E.price){
+      const estUp=Math.max(0.01,Math.min(0.99,0.5+(E.price-ref)/ref*450));
+      buyDn.textContent=Math.round((1-estUp)*100)+'¢*';
+      buyDn.parentElement.style.opacity='0.6';
+    }else buyDn.textContent='—¢';
+  }
+}
+
+// ── Auto-redeem wins ──
+async function polyAutoRedeem(){
+  if(!_polyApiCreds)return;
+  try{
+    const funder=_polyApiCreds.funder||_polyApiCreds.walletAddress;
+    const r=await fetch('https://data-api.polymarket.com/positions?user='+funder+'&sizeThreshold=0.01');
+    if(!r.ok)return;
+    const positions=await r.json();
+    if(!Array.isArray(positions)||!positions.length){log('ℹ Sem posições para resgatar','i');return;}
+    const redeemable=positions.filter(p=>p.redeemable||p.outcome==='won'||p.resolved);
+    if(!redeemable.length){log('ℹ Sem wins para resgatar','i');return;}
+    log('🎯 '+redeemable.length+' posição(ões) para resgatar','s');
+    for(const pos of redeemable){
+      if(pos.conditionId||pos.condition_id){
+        const cid=pos.conditionId||pos.condition_id;
+        log('💸 Resgatando: '+cid.slice(0,20)+'...','i');
+      }
+    }
+  }catch(e){log('Auto-redeem: '+e.message,'w');}
+}
+
+// Atualizar saldo a cada 30s
+setInterval(()=>{if(apiConfigured()&&_polyApiCreds&&!_polyAuthFailed)checkPolyBalance();},30000);
+// Resetar flag ao editar campos
+['apiPrivKey','apiFunder'].forEach(id=>{const el=g(id);if(el)el.addEventListener('input',()=>{_polyAuthFailed=false;updAPI();saveConfig();if(apiConfigured())setTimeout(checkPolyBalance,500);});});
+
+function validatePrivKey(el){
+  let v=el.value.trim().replace(/\s+/g,'');
+  if(!v){g('privKeyHint').style.display='none';return;}
+  if(v.startsWith('0x')||v.startsWith('0X'))v=v.slice(2);
+  const hint=g('privKeyHint');hint.style.display='block';
+  if(/^[0-9a-fA-F]{64}$/.test(v)){hint.textContent='✓ Formato válido ('+v.length+' chars)';hint.style.color='var(--up)';}
+  else{hint.textContent='✗ '+v.length+' chars (esperado 64)';hint.style.color='var(--dn)';}
 }
 
 // ── Kline Open (referência do período) ──
