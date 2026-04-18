@@ -536,7 +536,7 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
 
 <div id="loginScreen">
   <div class="login-box">
-    <div class="login-brand">MASTER<em>BOT</em><sup>v6.6</sup></div>
+    <div class="login-brand">MASTER<em>BOT</em><sup>v6.7</sup></div>
     <div class="login-sub">Acesso Restrito · Trading Platform</div>
     <div class="login-field">
       <label>Login</label>
@@ -554,7 +554,7 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
 <div id="appContent">
 <!-- ═══ TOPBAR ═══ -->
 <div class="topbar">
-  <div class="brand">MASTER<em>BOT</em><sup>v6.6</sup></div>
+  <div class="brand">MASTER<em>BOT</em><sup>v6.7</sup></div>
   <div class="chips" id="chips">
     <div class="chip active" data-sym="BTCUSDT" data-lbl="BTC">BTC</div>
     <div class="chip" data-sym="ETHUSDT" data-lbl="ETH">ETH</div>
@@ -1648,6 +1648,7 @@ async function polyL2Headers(method,requestPath,body=''){
     // Converter para base64url (sem padding, com - e _)
     let sigB64=btoa(String.fromCharCode(...new Uint8Array(sigBytes)));
     sigB64=sigB64.replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+    log('🔐 L2: ts='+ts+' msg='+message.slice(0,60)+' sig='+sigB64.slice(0,20),'i');
     
     return{
       'POLY_ADDRESS':_polyApiCreds.walletAddress,
@@ -1758,9 +1759,10 @@ async function polyPlaceOrder(tokenId,side,price,sizeUSDC){
     headers['Content-Type']='application/json';
     
     log('📡 Enviando ordem para Polymarket...','i');
+    log('🌐 Headers L2: '+JSON.stringify({key:headers['POLY_API_KEY']?.slice(0,8),ts:headers['POLY_TIMESTAMP'],sig:headers['POLY_SIGNATURE']?.slice(0,20)}),'i');
     const res=await fetch(POLY_HOST+'/order',{method:'POST',headers,body:bodyStr});
     const txt=await res.text();
-    log('📥 HTTP '+res.status+': '+txt.slice(0,250),'i');
+    log('📥 HTTP '+res.status+': '+txt.slice(0,300),'i');
     
     let result;
     try{result=JSON.parse(txt);}catch(e){result={error:txt};}
@@ -1866,7 +1868,8 @@ async function polyGetBalance(){
     // 1. USDC livre — endpoint autenticado L2
     if(_polyApiCreds){
       try{
-        const path='/balance-allowance?asset_type=COLLATERAL';
+        // Testar ambos os formatos do asset_type
+        const path='/balance-allowance?asset_type=0';
         const headers=await polyL2Headers('GET',path,'');
         if(headers){
           headers['Content-Type']='application/json';
