@@ -536,7 +536,7 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
 
 <div id="loginScreen">
   <div class="login-box">
-    <div class="login-brand">MASTER<em>BOT</em><sup>v9.7</sup></div>
+    <div class="login-brand">MASTER<em>BOT</em><sup>v9.9</sup></div>
     <div class="login-sub">Acesso Restrito · Trading Platform</div>
     <div class="login-field">
       <label>Login</label>
@@ -554,7 +554,7 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
 <div id="appContent">
 <!-- ═══ TOPBAR ═══ -->
 <div class="topbar">
-  <div class="brand">MASTER<em>BOT</em><sup>v9.7</sup></div>
+  <div class="brand">MASTER<em>BOT</em><sup>v9.9</sup></div>
   <div class="chips" id="chips">
     <div class="chip active" data-sym="BTCUSDT" data-lbl="BTC">BTC</div>
     <div class="chip" data-sym="ETHUSDT" data-lbl="ETH">ETH</div>
@@ -584,6 +584,7 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
   <button class="tab-btn" id="tabU" onclick="switchTab('u')"><div class="tab-dot"></div>DRBOT ↑ UP</button>
   <button class="tab-btn" id="tabD" onclick="switchTab('d')"><div class="tab-dot"></div>DRBOT ↓ DOWN</button>
   <button class="tab-btn" id="tabA" onclick="switchTab('a')"><div class="tab-dot" style="background:var(--blue)"></div>ANÁLISE</button>
+  <button class="tab-btn" id="tabC" onclick="switchTab('c')"><div class="tab-dot" id="tabCDot" style="background:var(--gold)"></div>CONEXÕES</button>
 </div>
 
 <!-- ═══ EDGEBOT TAB ═══ -->
@@ -833,100 +834,38 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
         <!-- LEFT COL -->
         <div class="dr-col">
           <div class="sec">🔐 API Polymarket</div>
-          <div class="api-card">
-            <div class="api-card-title">🔐 CREDENCIAIS — Magic Wallet (Email)</div>
-            <div class="fld" style="margin-bottom:6px">
-              <label>Private Key <span style="color:var(--txt3);font-size:7px">(reveal.magic.link/polymarket)</span></label>
-              <input type="password" id="apiPrivKey" placeholder="0x... (64 caracteres hex)" autocomplete="off" oninput="validatePrivKey(this)">
-              <div id="privKeyHint" style="font-family:'JetBrains Mono',monospace;font-size:7px;margin-top:3px;display:none"></div>
+          <div class="card" style="padding:10px;text-align:center">
+            <div style="font-family:'JetBrains Mono',monospace;font-size:8px;color:var(--txt3);margin-bottom:8px">
+              Configurações de conexão movidas para a aba
             </div>
-            <div class="fld" style="margin-bottom:6px">
-              <label>Funder Address <span style="color:var(--txt3);font-size:7px">(endereço do seu perfil)</span></label>
-              <input type="password" id="apiFunder" placeholder="0x..." autocomplete="off">
-            </div>
-            <div class="fld-hint" style="margin-bottom:8px;color:var(--txt3)">⚠ Nunca compartilhe — guardado só neste dispositivo</div>
-            <!-- Campos legados mantidos ocultos para compatibilidade -->
-            <!-- TokenIDs manuais (fallback se Safari bloquear) -->
-            <div id="manualTokenSection" style="margin-top:6px;padding:6px;background:rgba(255,165,0,.06);border:1px solid rgba(255,165,0,.2);border-radius:6px;">
-              <div style="font-family:'JetBrains Mono',monospace;font-size:7px;color:var(--gold);margin-bottom:4px;cursor:pointer" onclick="g('manualTokenBody').style.display=g('manualTokenBody').style.display==='none'?'block':'none'">
-                ▶ TOKEN IDs MANUAIS (se Safari bloquear busca automática)
+            <button onclick="switchTab('c')" style="padding:4px 14px;background:rgba(255,165,0,.15);border:1px solid var(--gold);border-radius:5px;color:var(--gold);font-family:'JetBrains Mono',monospace;font-size:8px;cursor:pointer">
+              ⚡ ABRIR ABA CONEXÕES
+            </button>
+            <div class="api-status" style="margin-top:8px"><div class="api-dot" id="apiDot2"></div><div style="font-size:8px;color:var(--txt3)" id="apiStatus2">—</div></div>
+          </div>
+          <div class="sec">📊 Mercado UP</div>
+          <div class="card">
+            <div class="g2">
+              <div class="fld"><label>Timeframe</label>
+                <select id="tfU">
+                  <option value="5m">5 min (Chainlink)</option>
+                  <option value="15m" selected>15 min (Chainlink)</option>
+                  <option value="1h">1 hora (Binance)</option>
+                  <option value="4h">4 horas (Binance)</option>
+                  <option value="1d">Daily (Binance)</option>
+                </select>
               </div>
-              <div id="manualTokenBody" style="display:none">
-                <div style="font-family:'JetBrains Mono',monospace;font-size:7px;color:var(--txt3);margin-bottom:4px">Obtém em polymarket.com → mercado BTC 5min → inspecionar URL do token UP/DOWN</div>
-                <label style="font-family:'JetBrains Mono',monospace;font-size:7px;color:var(--txt2)">TOKEN UP</label>
-                <input type="text" id="manualUpToken" placeholder="0x123...abc" autocomplete="off"
-                  style="font-family:'JetBrains Mono',monospace;font-size:8px;padding:3px 6px;background:var(--bg2);border:1px solid var(--b2);border-radius:4px;color:var(--txt);width:100%;margin-bottom:3px"
-                  oninput="saveConfig()">
-                <label style="font-family:'JetBrains Mono',monospace;font-size:7px;color:var(--txt2)">TOKEN DOWN</label>
-                <input type="text" id="manualDnToken" placeholder="0x456...def" autocomplete="off"
-                  style="font-family:'JetBrains Mono',monospace;font-size:8px;padding:3px 6px;background:var(--bg2);border:1px solid var(--b2);border-radius:4px;color:var(--txt);width:100%"
-                  oninput="saveConfig()">
-                <button onclick="P.upTokenId=gv('manualUpToken').trim();P.dnTokenId=gv('manualDnToken').trim();log('✓ TokenIDs manuais: '+P.upTokenId.slice(0,10)+'...','s')" 
-                  style="margin-top:4px;padding:2px 8px;background:rgba(255,165,0,.2);border:1px solid var(--gold);border-radius:4px;color:var(--gold);font-size:7px;font-family:'JetBrains Mono',monospace;cursor:pointer">
-                  ✓ Aplicar TokenIDs
-                </button>
+              <div class="fld"><label>Modo</label>
+                <select id="modeU">
+                  <option value="up" selected>Will BTC go UP?</option>
+                  <option value="down">Will BTC go DOWN?</option>
+                  <option value="auto">🤖 AUTO (edge define)</option>
+                </select>
               </div>
             </div>
-            <!-- Modo alternativo: inserir credenciais diretamente -->
-            <div id="directCredsSection" style="margin-top:8px;padding:8px;background:rgba(255,165,0,.08);border:1px solid rgba(255,165,0,.3);border-radius:6px;">
-              <div style="font-family:'JetBrains Mono',monospace;font-size:7px;color:var(--gold);margin-bottom:6px;cursor:pointer" onclick="g('directCredsBody').style.display=g('directCredsBody').style.display==='none'?'block':'none'">
-                ▶ MODO DIRETO — inserir API Key/Secret/Passphrase manualmente (opcional)
-              </div>
-              <div id="directCredsBody" style="display:none">
-                <div style="font-family:'JetBrains Mono',monospace;font-size:7px;color:var(--txt3);margin-bottom:4px">
-                  Use isto se a autenticação automática falhar. Obtenha as credenciais com:<br>
-                  <code style="color:var(--gold)">pip install py-clob-client</code> e o script Python
-                </div>
-                <div style="font-family:'JetBrains Mono',monospace;font-size:7px;color:var(--txt3);margin-bottom:6px">
-                  Signer Address = endereço da private key (0x89C...). Funder = endereço do perfil (0xf41...).
-                </div>
-                <label style="font-family:'JetBrains Mono',monospace;font-size:7px;color:var(--txt2)">SIGNER ADDRESS <span style="color:var(--txt3)">(endereço da private key)</span></label>
-                <input type="text" id="apiSigner" placeholder="0x89C4734d..." autocomplete="off"
-                  style="font-family:'JetBrains Mono',monospace;font-size:8px;padding:4px 6px;background:var(--bg2);border:1px solid var(--b2);border-radius:4px;color:var(--txt);width:100%;margin-bottom:4px"
-                  oninput="onDirectCredsInput()">
-                <label style="font-family:'JetBrains Mono',monospace;font-size:7px;color:var(--txt2)">API KEY</label>
-                <input type="text" id="apiKey" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" autocomplete="off"
-                  style="font-family:'JetBrains Mono',monospace;font-size:8px;padding:4px 6px;background:var(--bg2);border:1px solid var(--b2);border-radius:4px;color:var(--txt);width:100%;margin-bottom:4px"
-                  oninput="onDirectCredsInput()">
-                <div style="display:flex;justify-content:space-between;align-items:center">
-                  <label style="font-family:'JetBrains Mono',monospace;font-size:7px;color:var(--txt2)">SECRET</label>
-                  <span id="secretLen" style="font-family:'JetBrains Mono',monospace;font-size:7px;color:var(--txt3)">0 chars</span>
-                </div>
-                <input type="text" id="apiSecret" placeholder="base64 secret (44 chars)..." autocomplete="off"
-                  style="font-family:'JetBrains Mono',monospace;font-size:8px;padding:4px 6px;background:var(--bg2);border:1px solid var(--b2);border-radius:4px;color:var(--txt);width:100%;margin-bottom:4px"
-                  oninput="const sl=g('secretLen');if(sl)sl.textContent=this.value.length+' chars';onDirectCredsInput()">
-                <label style="font-family:'JetBrains Mono',monospace;font-size:7px;color:var(--txt2)">PASSPHRASE</label>
-                <input type="password" id="apiPass" placeholder="passphrase..." autocomplete="off"
-                  style="font-family:'JetBrains Mono',monospace;font-size:8px;padding:4px 6px;background:var(--bg2);border:1px solid var(--b2);border-radius:4px;color:var(--txt);width:100%"
-                  oninput="onDirectCredsInput()">
-              </div>
-            </div>
-            <div class="api-status"><div class="api-dot" id="apiDot"></div><div style="font-size:8px;color:var(--txt3)" id="apiStatus">Não configurado — modo simulação</div></div>
           </div>
 
 ```
-      <div class="sec">📊 Mercado UP</div>
-      <div class="card">
-        <div class="g2">
-          <div class="fld"><label>Timeframe</label>
-            <select id="tfU">
-              <option value="5m">5 min (Chainlink)</option>
-              <option value="15m" selected>15 min (Chainlink)</option>
-              <option value="1h">1 hora (Binance)</option>
-              <option value="4h">4 horas (Binance)</option>
-              <option value="1d">Daily (Binance)</option>
-            </select>
-          </div>
-          <div class="fld"><label>Modo</label>
-            <select id="modeU">
-              <option value="up" selected>Will BTC go UP?</option>
-              <option value="down">Will BTC go DOWN?</option>
-              <option value="auto">🤖 AUTO (edge define)</option>
-            </select>
-          </div>
-        </div>
-      </div>
-
       <div class="sec">🎯 Gatilho Polymarket</div>
       <div class="card">
         <div class="g2">
@@ -1798,6 +1737,45 @@ async function testL2Auth(){
 
 
 
+
+
+async function checkAllConnections(){
+  const log=(msg,ok)=>{
+    const el=document.getElementById('connLog');
+    if(el){const d=document.createElement('div');
+      d.style.color=ok?'var(--up)':ok===false?'var(--dn)':'var(--txt3)';
+      d.textContent=new Date().toLocaleTimeString()+' '+msg;
+      el.appendChild(d);el.scrollTop=el.scrollHeight;}
+  };
+  const set=(id,txt,ok)=>{const el=document.getElementById(id);if(el){el.textContent=txt;el.style.color=ok?'var(--up)':ok===false?'var(--dn)':'var(--txt3)';}};
+  
+  // Testar CLOB
+  try{
+    const r=await fetch('https://clob.polymarket.com/ok',{signal:AbortSignal.timeout(3000)});
+    set('connPolyStatus',r.ok?'● ONLINE':'● ERRO',r.ok);
+    log('CLOB: HTTP '+r.status,r.ok);
+  }catch(e){set('connPolyStatus','● OFFLINE',false);log('CLOB: '+e.message,false);}
+  
+  // Testar Replit
+  try{
+    const r=await fetch(SIGN_SERVER.replace('/sign','/health')||SIGN_SERVER,{signal:AbortSignal.timeout(3000),method:'GET'});
+    set('connReplitStatus',r.ok?'● ONLINE':'● SEM CRÉDITOS',r.ok);
+    log('Replit: HTTP '+r.status,r.ok);
+  }catch(e){set('connReplitStatus','● OFFLINE',false);log('Replit: offline',false);}
+  
+  // Testar mercado
+  const hasToken=!!(P&&P.upTokenId);
+  set('connMarketStatus',hasToken?'● TOKEN OK':'● SEM TOKEN',hasToken);
+  log('Mercado: '+(hasToken?P.marketSlug:'não encontrado'),hasToken);
+  
+  // Testar Binance
+  const binOk=!!_wsU||!!_wsD;
+  set('connBinanceStatus',binOk?'● CONECTADO':'● DESCONECTADO',binOk);
+  log('Binance WS: '+(binOk?'activo':'desconectado'),binOk);
+  
+  // Testar saldo
+  await checkPolyBalance();
+}
 
 // ── Executar ordem REAL na Polymarket ──
 async function polyPlaceOrder(tokenId,side,price,sizeUSDC){
@@ -2832,16 +2810,23 @@ async function executeTrade(B){
     log('🔄 Buscando tokenId antes da ordem...','i');
     await fetchPolyPrices();
   }
-  const _wasReal=apiConfigured()&&!!(s==='u'?P.upTokenId:P.dnTokenId);
-  // EXECUÇÃO REAL — se API configurada, postar ordem na Polymarket
-  if(_wasReal){
+  // Executar ordem REAL — só se tiver tokenId válido
+  B._lastTradeReal=false; // SIM por defeito até confirmação
+  const _hasToken=!!(s==='u'?P.upTokenId:P.dnTokenId);
+  if(apiConfigured()&&_hasToken){
     const tokenId=s==='u'?P.upTokenId:P.dnTokenId;
     polyPlaceOrder(tokenId,'BUY',polyP,sz).then(result=>{
       if(result){
+        B._lastTradeReal=true; // REAL só após confirmação
+        log('✅ Ordem confirmada na Polymarket!','s');
         const diagEl=g('diag'+s.toUpperCase());
-        if(diagEl)diagEl.innerHTML=`<span style="color:var(--up)">✅ ORDEM REAL enviada · aguardando fechamento ${ml}:${sl2}...</span>`;
+        if(diagEl)diagEl.innerHTML=`<span style="color:var(--up)">✅ ORDEM REAL · aguardando fechamento ${ml}:${sl2}...</span>`;
+      } else {
+        log('⚠ Ordem falhou — trade fica como SIM','w');
       }
     });
+  } else {
+    if(!_hasToken)log('⚠ tokenId em falta — trade SIM','w');
   }
   updLabel(s);updBridges();updTrigStatus(s);
   const diagEl=g('diag'+s.toUpperCase());
@@ -2872,7 +2857,7 @@ async function executeTrade(B){
     if(win){log(`${tag} ${dirLabel} #${B.rounds} ✓ WIN · ${resMsg} · +${profit.toFixed(2)} USDC`,'s');if(apiConfigured()&&_polyApiCreds)setTimeout(polyAutoRedeem,2000);}
     else   log(`${tag} ${dirLabel} #${B.rounds} ✗ LOSS · ${resMsg} · -${sz.toFixed(2)} USDC`,'e');
 
-    addTradeRow(s,B.rounds,et,sz,win,pd,Math.round(polyP*100),entryTime,entryDiff,tIn,_wasReal);
+    addTradeRow(s,B.rounds,et,sz,win,pd,Math.round(polyP*100),entryTime,entryDiff,tIn,B._lastTradeReal||false);
     updOV(s);drawPnlChart(s);flash(win);updBridges();updLabel(s);saveHistory();
 
     if(slOn&&B.consec>=slN){log(`⚠ Stop Loss ${actualDir}: ${B.consec} perdas consecutivas.`,'w');toast(`Stop Loss ${actualDir}`);stopBot(s);return;}
@@ -3314,7 +3299,7 @@ function setTM(s,m){
 
 // ── Tab switch ──
 function switchTab(t){
-  ['e','u','d','a'].forEach(x=>{
+  ['e','u','d','a','c'].forEach(x=>{
     const p=g('panel'+x.toUpperCase()),b=g('tab'+x.toUpperCase());
     if(p)p.classList.toggle('active',x===t);
     if(b)b.className='tab-btn'+(x===t?' a'+x:'');
@@ -3544,5 +3529,203 @@ if(apiConfigured())setTimeout(checkPolyBalance,1000);},300);
 })();
 </script>
 
+<!-- ═══ CONEXÕES TAB ═══ -->
+
+<div class="tab-panel" id="panelC">
+  <div class="dr-wrap">
+    <div class="phead">
+      <div class="phead-title"><div class="phead-dot" style="background:var(--gold)"></div>CONEXÕES — Polymarket API</div>
+    </div>
+    <div class="dr-body">
+      <div class="dr-cols">
+        <div class="dr-col">
+          <div class="sec">🔐 API Polymarket</div>
+          <div class="api-card">
+            <div class="api-card-title">🔐 CREDENCIAIS — Magic Wallet (Email)</div>
+            <div class="fld" style="margin-bottom:6px">
+              <label>Private Key <span style="color:var(--txt3);font-size:7px">(reveal.magic.link/polymarket)</span></label>
+              <input type="password" id="apiPrivKey" placeholder="0x... (64 caracteres hex)" autocomplete="off" oninput="validatePrivKey(this)">
+              <div id="privKeyHint" style="font-family:'JetBrains Mono',monospace;font-size:7px;margin-top:3px;display:none"></div>
+            </div>
+            <div class="fld" style="margin-bottom:6px">
+              <label>Funder Address <span style="color:var(--txt3);font-size:7px">(endereço do seu perfil)</span></label>
+              <input type="password" id="apiFunder" placeholder="0x..." autocomplete="off">
+            </div>
+            <div class="fld-hint" style="margin-bottom:8px;color:var(--txt3)">⚠ Nunca compartilhe — guardado só neste dispositivo</div>
+            <!-- Campos legados mantidos ocultos para compatibilidade -->
+            <!-- TokenIDs manuais (fallback se Safari bloquear) -->
+            <div id="manualTokenSection" style="margin-top:6px;padding:6px;background:rgba(255,165,0,.06);border:1px solid rgba(255,165,0,.2);border-radius:6px;">
+              <div style="font-family:'JetBrains Mono',monospace;font-size:7px;color:var(--gold);margin-bottom:4px;cursor:pointer" onclick="g('manualTokenBody').style.display=g('manualTokenBody').style.display==='none'?'block':'none'">
+                ▶ TOKEN IDs MANUAIS (se Safari bloquear busca automática)
+              </div>
+              <div id="manualTokenBody" style="display:none">
+                <div style="font-family:'JetBrains Mono',monospace;font-size:7px;color:var(--txt3);margin-bottom:4px">Obtém em polymarket.com → mercado BTC 5min → inspecionar URL do token UP/DOWN</div>
+                <label style="font-family:'JetBrains Mono',monospace;font-size:7px;color:var(--txt2)">TOKEN UP</label>
+                <input type="text" id="manualUpToken" placeholder="0x123...abc" autocomplete="off"
+                  style="font-family:'JetBrains Mono',monospace;font-size:8px;padding:3px 6px;background:var(--bg2);border:1px solid var(--b2);border-radius:4px;color:var(--txt);width:100%;margin-bottom:3px"
+                  oninput="saveConfig()">
+                <label style="font-family:'JetBrains Mono',monospace;font-size:7px;color:var(--txt2)">TOKEN DOWN</label>
+                <input type="text" id="manualDnToken" placeholder="0x456...def" autocomplete="off"
+                  style="font-family:'JetBrains Mono',monospace;font-size:8px;padding:3px 6px;background:var(--bg2);border:1px solid var(--b2);border-radius:4px;color:var(--txt);width:100%"
+                  oninput="saveConfig()">
+                <button onclick="P.upTokenId=gv('manualUpToken').trim();P.dnTokenId=gv('manualDnToken').trim();log('✓ TokenIDs manuais: '+P.upTokenId.slice(0,10)+'...','s')" 
+                  style="margin-top:4px;padding:2px 8px;background:rgba(255,165,0,.2);border:1px solid var(--gold);border-radius:4px;color:var(--gold);font-size:7px;font-family:'JetBrains Mono',monospace;cursor:pointer">
+                  ✓ Aplicar TokenIDs
+                </button>
+              </div>
+            </div>
+            <!-- Modo alternativo: inserir credenciais diretamente -->
+            <div id="directCredsSection" style="margin-top:8px;padding:8px;background:rgba(255,165,0,.08);border:1px solid rgba(255,165,0,.3);border-radius:6px;">
+              <div style="font-family:'JetBrains Mono',monospace;font-size:7px;color:var(--gold);margin-bottom:6px;cursor:pointer" onclick="g('directCredsBody').style.display=g('directCredsBody').style.display==='none'?'block':'none'">
+                ▶ MODO DIRETO — inserir API Key/Secret/Passphrase manualmente (opcional)
+              </div>
+              <div id="directCredsBody" style="display:none">
+                <div style="font-family:'JetBrains Mono',monospace;font-size:7px;color:var(--txt3);margin-bottom:4px">
+                  Use isto se a autenticação automática falhar. Obtenha as credenciais com:<br>
+                  <code style="color:var(--gold)">pip install py-clob-client</code> e o script Python
+                </div>
+                <div style="font-family:'JetBrains Mono',monospace;font-size:7px;color:var(--txt3);margin-bottom:6px">
+                  Signer Address = endereço da private key (0x89C...). Funder = endereço do perfil (0xf41...).
+                </div>
+                <label style="font-family:'JetBrains Mono',monospace;font-size:7px;color:var(--txt2)">SIGNER ADDRESS <span style="color:var(--txt3)">(endereço da private key)</span></label>
+                <input type="text" id="apiSigner" placeholder="0x89C4734d..." autocomplete="off"
+                  style="font-family:'JetBrains Mono',monospace;font-size:8px;padding:4px 6px;background:var(--bg2);border:1px solid var(--b2);border-radius:4px;color:var(--txt);width:100%;margin-bottom:4px"
+                  oninput="onDirectCredsInput()">
+                <label style="font-family:'JetBrains Mono',monospace;font-size:7px;color:var(--txt2)">API KEY</label>
+                <input type="text" id="apiKey" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" autocomplete="off"
+                  style="font-family:'JetBrains Mono',monospace;font-size:8px;padding:4px 6px;background:var(--bg2);border:1px solid var(--b2);border-radius:4px;color:var(--txt);width:100%;margin-bottom:4px"
+                  oninput="onDirectCredsInput()">
+                <div style="display:flex;justify-content:space-between;align-items:center">
+                  <label style="font-family:'JetBrains Mono',monospace;font-size:7px;color:var(--txt2)">SECRET</label>
+                  <span id="secretLen" style="font-family:'JetBrains Mono',monospace;font-size:7px;color:var(--txt3)">0 chars</span>
+                </div>
+                <input type="text" id="apiSecret" placeholder="base64 secret (44 chars)..." autocomplete="off"
+                  style="font-family:'JetBrains Mono',monospace;font-size:8px;padding:4px 6px;background:var(--bg2);border:1px solid var(--b2);border-radius:4px;color:var(--txt);width:100%;margin-bottom:4px"
+                  oninput="const sl=g('secretLen');if(sl)sl.textContent=this.value.length+' chars';onDirectCredsInput()">
+                <label style="font-family:'JetBrains Mono',monospace;font-size:7px;color:var(--txt2)">PASSPHRASE</label>
+                <input type="password" id="apiPass" placeholder="passphrase..." autocomplete="off"
+                  style="font-family:'JetBrains Mono',monospace;font-size:8px;padding:4px 6px;background:var(--bg2);border:1px solid var(--b2);border-radius:4px;color:var(--txt);width:100%"
+                  oninput="onDirectCredsInput()">
+              </div>
+            </div>
+            <div class="api-status"><div class="api-dot" id="apiDot"></div><div style="font-size:8px;color:var(--txt3)" id="apiStatus">Não configurado — modo simulação</div></div>
+          </div>
+
+```
+      <div class="sec">⏱ Fechamento do Período Polymarket</div>
+    <div style="background:var(--bg2);border:1px solid var(--b2);border-radius:10px;padding:12px;margin-bottom:8px;display:flex;align-items:center;gap:14px;">
+      <!-- single ring -->
+      <div style="position:relative;width:76px;height:76px;flex-shrink:0;">
+        <svg width="76" height="76" viewBox="0 0 76 76" style="position:absolute;top:0;left:0;transform:rotate(-90deg)">
+          <circle cx="38" cy="38" r="30" fill="none" stroke="var(--b1)" stroke-width="5"/>
+          <circle cx="38" cy="38" r="30" fill="none" stroke="var(--gold)" stroke-width="5"
+            stroke-dasharray="188" stroke-dashoffset="0" id="clockRing"
+            stroke-linecap="round" style="transition:stroke-dashoffset 1s linear,stroke .4s"/>
+        </svg>
+        <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;">
+          <div style="font-family:'Bebas Neue',sans-serif;font-size:20px;line-height:1;color:var(--white)" id="clockCd">—:——</div>
+          <div style="font-family:'JetBrains Mono',monospace;font-size:7px;color:var(--txt3);" id="clockPct">—%</div>
+        </div>
+      </div>
+      <!-- info -->
+      <div style="flex:1;">
+        <div style="font-family:'JetBrains Mono',monospace;font-size:8px;color:var(--txt3);letter-spacing:1px;margin-bottom:4px;">PERÍODO ATUAL</div>
+        <div style="font-family:'Bebas Neue',sans-serif;font-size:13px;letter-spacing:2px;margin-bottom:3px;" id="clockPeriodLbl" style="color:var(--white)">——</div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:8px;color:var(--txt2);margin-bottom:6px;" id="clockTfLbl">Timeframe: —</div>
+        <!-- UP and DOWN status inline -->
+        <!-- Delta line -->
+        <div style="font-family:'JetBrains Mono',monospace;font-size:8px;margin-bottom:5px;display:flex;gap:8px;flex-wrap:wrap;" id="clockDelta"><span style="color:var(--txt3)">Aguardando ref...</span></div>
+        <div style="display:flex;gap:6px;margin-bottom:6px;">
+          <div style="font-family:'JetBrains Mono',monospace;font-size:7px;padding:2px 6px;border-radius:4px;background:var(--up3);color:var(--up);" id="clockStU">UP: parado</div>
+          <div style="font-family:'JetBrains Mono',monospace;font-size:7px;padding:2px 6px;border-radius:4px;background:var(--dn3);color:var(--dn);" id="clockStD">DN: parado</div>
+        </div>
+        <!-- Botões Buy UP / Buy DOWN estilo Polymarket -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;">
+          <div style="background:rgba(0,229,160,.15);border:1px solid var(--up);border-radius:7px;padding:5px 8px;text-align:center;cursor:default;">
+            <div style="font-family:'JetBrains Mono',monospace;font-size:7px;color:var(--up);margin-bottom:2px;">BUY UP ↑</div>
+            <div style="font-family:'Bebas Neue',sans-serif;font-size:16px;color:var(--up);line-height:1" id="polyBuyUp">—¢</div>
+          </div>
+          <div style="background:rgba(255,59,92,.15);border:1px solid var(--dn);border-radius:7px;padding:5px 8px;text-align:center;cursor:default;">
+            <div style="font-family:'JetBrains Mono',monospace;font-size:7px;color:var(--dn);margin-bottom:2px;">BUY DOWN ↓</div>
+            <div style="font-family:'Bebas Neue',sans-serif;font-size:16px;color:var(--dn);line-height:1" id="polyBuyDn">—¢</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Saldo Polymarket — só aparece quando API configurada -->
+    <div id="polyBalanceCard" style="display:none;background:var(--bg2);border:1px solid var(--b2);border-radius:10px;padding:10px;margin-bottom:8px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+        <div style="font-family:'JetBrains Mono',monospace;font-size:7px;color:var(--txt3);letter-spacing:1px">💰 SALDO POLYMARKET</div>
+        <div style="display:flex;align-items:center;gap:6px;">
+          <button onclick="polyAutoRedeem()" title="Resgatar wins automaticamente" style="padding:2px 7px;background:rgba(0,229,160,.15);border:1px solid var(--up);border-radius:4px;color:var(--up);font-size:7px;cursor:pointer;font-family:'JetBrains Mono',monospace">💸 Resgatar</button>
+          <button onclick="testL2Auth()" style="padding:2px 7px;background:rgba(100,100,255,.2);border:1px solid #6666ff;border-radius:4px;color:#aaaaff;font-size:7px;cursor:pointer;font-family:'JetBrains Mono',monospace">🧪 Testar</button>
+          <button onclick="checkPolyBalance()" style="padding:2px 7px;background:var(--bg3);border:1px solid var(--b2);border-radius:4px;color:var(--txt2);font-size:8px;cursor:pointer;font-family:'JetBrains Mono',monospace">↺</button>
+          <div style="font-family:'JetBrains Mono',monospace;font-size:7px;color:var(--up)" id="polyConnStatus">● REAL</div>
+        </div>
+      </div>
+      <!-- Números de saldo -->
+      <div id="polyBalanceDisplay">
+        <span style="color:var(--txt3);font-family:'JetBrains Mono',monospace;font-size:8px">Carregando...</span>
+      </div>
+      <!-- Saldo manual (fallback) -->
+      <div style="margin-top:6px;display:flex;align-items:center;gap:6px;">
+        <input type="number" id="manualBalance" placeholder="Saldo manual $" step="0.01" min="0"
+          style="font-family:'JetBrains Mono',monospace;font-size:9px;padding:3px 6px;background:var(--bg3);border:1px solid var(--b2);border-radius:4px;color:var(--txt);width:100px;"
+          oninput="localStorage.setItem('_manualBalance',this.value);checkPolyBalance()">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:7px;color:var(--txt3)">← inserir saldo manualmente se necessário</span>
+      </div>
+      <!-- Mini gráfico evolução do saldo -->
+      <div style="margin-top:8px;position:relative;">
+        <div style="font-family:'JetBrains Mono',monospace;font-size:6px;color:var(--txt3);margin-bottom:3px;letter-spacing:1px">EVOLUÇÃO DO SALDO</div>
+        <canvas id="balChart" style="width:100%;height:56px;display:block;border-radius:4px;"></canvas>
+        <div style="display:flex;justify-content:space-between;margin-top:2px;">
+          <span style="font-family:'JetBrains Mono',monospace;font-size:6px;color:var(--txt3)" id="balChartMin">—</span>
+          <span style="font-family:'JetBrains Mono',monospace;font-size:6px;color:var(--txt3)" id="balChartMax">—</span>
+        </div>
+      </div>
+    </div>
+
+    
+    </div>
+    <div class="dr-col">
+      <!-- Status de conexão -->
+      <div class="sec">📡 Estado da Ligação</div>
+      <div class="card" style="padding:10px">
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <div style="display:flex;justify-content:space-between;align-items:center;font-family:'JetBrains Mono',monospace;font-size:8px">
+            <span style="color:var(--txt3)">POLYMARKET CLOB</span>
+            <span id="connPolyStatus" style="color:var(--txt3)">—</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;font-family:'JetBrains Mono',monospace;font-size:8px">
+            <span style="color:var(--txt3)">SIGN SERVER (REPLIT)</span>
+            <span id="connReplitStatus" style="color:var(--txt3)">—</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;font-family:'JetBrains Mono',monospace;font-size:8px">
+            <span style="color:var(--txt3)">MERCADO BTC 5M</span>
+            <span id="connMarketStatus" style="color:var(--txt3)">—</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;font-family:'JetBrains Mono',monospace;font-size:8px">
+            <span style="color:var(--txt3)">BINANCE WS</span>
+            <span id="connBinanceStatus" style="color:var(--txt3)">—</span>
+          </div>
+        </div>
+        <button onclick="checkAllConnections()" style="margin-top:10px;width:100%;padding:4px;background:rgba(0,229,160,.1);border:1px solid var(--up);border-radius:5px;color:var(--up);font-family:'JetBrains Mono',monospace;font-size:8px;cursor:pointer">
+          🔄 Testar Todas as Conexões
+        </button>
+      </div>
+      
+      <!-- Log de conexão -->
+      <div class="sec" style="margin-top:10px">📋 Log</div>
+      <div class="card" style="padding:6px">
+        <div id="connLog" style="font-family:'JetBrains Mono',monospace;font-size:7px;color:var(--txt2);max-height:200px;overflow-y:auto;line-height:1.6"></div>
+      </div>
+    </div>
+  </div>
+</div>
+```
+
+  </div>
+</div>
 </body>
 </html>
