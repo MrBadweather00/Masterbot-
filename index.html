@@ -536,7 +536,7 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
 
 <div id="loginScreen">
   <div class="login-box">
-    <div class="login-brand">MASTER<em>BOT</em><sup>v8.5</sup></div>
+    <div class="login-brand">MASTER<em>BOT</em><sup>v8.6</sup></div>
     <div class="login-sub">Acesso Restrito · Trading Platform</div>
     <div class="login-field">
       <label>Login</label>
@@ -554,7 +554,7 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
 <div id="appContent">
 <!-- ═══ TOPBAR ═══ -->
 <div class="topbar">
-  <div class="brand">MASTER<em>BOT</em><sup>v8.5</sup></div>
+  <div class="brand">MASTER<em>BOT</em><sup>v8.6</sup></div>
   <div class="chips" id="chips">
     <div class="chip active" data-sym="BTCUSDT" data-lbl="BTC">BTC</div>
     <div class="chip" data-sym="ETHUSDT" data-lbl="ETH">ETH</div>
@@ -1669,8 +1669,9 @@ async function polyL2Headers(method,requestPath,body){
     if(!ts)ts=String(Math.floor(Date.now()/1000));
 
     const bodyStr=(body!==undefined)?body:'';
-    // CRÍTICO: body só incluído se !== undefined (igual ao oficial)
-    let message=ts+method.toUpperCase()+requestPath;
+    // CRÍTICO: assinar só o path BASE sem query string (confirmado pelo Replit)
+    const pathBase=requestPath.split('?')[0];
+    let message=ts+method.toUpperCase()+pathBase;
     if(body!==undefined)message+=bodyStr;
 
     const secret=_polyApiCreds.secret||'';
@@ -1725,9 +1726,9 @@ async function testL2Auth(){
   if(!_polyApiCreds){log('Sem creds','w');return;}
   const secret=_polyApiCreds.secret;
   const ts=String(Math.floor(Date.now()/1000));
-  const path='/balance-allowance?asset_type=0';
+  const path='/balance-allowance?asset_type=COLLATERAL&signature_type=1';
   
-  log('🧪 Testando HMAC oficial: secret='+secret.length+'chars','i');
+  log('🧪 Testando HMAC: path sem query string, endpoint COLLATERAL','i');
   
   // Decodificar secret
   let b64=secret.replace(/-/g,'+').replace(/_/g,'/');
@@ -1744,14 +1745,11 @@ async function testL2Auth(){
   
   const variants=[
     // msg sem body (GET correto), output base64 standard
-    {name:'noBody+b64std+wallet', msg:ts+'GET'+path, addr:walletAddr, b64url:false},
-    {name:'noBody+b64std+funder', msg:ts+'GET'+path, addr:funderAddr, b64url:false},
-    // msg sem body, output base64url
-    {name:'noBody+b64url+wallet', msg:ts+'GET'+path, addr:walletAddr, b64url:true},
-    {name:'noBody+b64url+funder', msg:ts+'GET'+path, addr:funderAddr, b64url:true},
-    // msg com body vazio string
-    {name:'emptyBody+b64std+wallet', msg:ts+'GET'+path+'', addr:walletAddr, b64url:false},
-    {name:'emptyBody+b64url+funder', msg:ts+'GET'+path+'', addr:funderAddr, b64url:true},
+    // CONFIRMADO: assinar SÓ o path base sem query string
+    {name:'noBody+b64url+wallet', msg:ts+'GET'+pathBase, addr:walletAddr, b64url:true},
+    {name:'noBody+b64url+funder', msg:ts+'GET'+pathBase, addr:funderAddr, b64url:true},
+    {name:'noBody+b64std+wallet', msg:ts+'GET'+pathBase, addr:walletAddr, b64url:false},
+    {name:'noBody+b64std+funder', msg:ts+'GET'+pathBase, addr:funderAddr, b64url:false},
   ];
   
   for(const v of variants){
@@ -2005,7 +2003,7 @@ async function polyGetBalance(){
     if(_polyApiCreds){
       try{
         // Testar ambos os formatos do asset_type
-        const path='/balance-allowance?asset_type=0';
+        const path='/balance-allowance?asset_type=COLLATERAL&signature_type=1';
         const headers=await polyL2Headers('GET',path);
         if(headers){
           headers['Content-Type']='application/json';
