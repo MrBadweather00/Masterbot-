@@ -536,7 +536,7 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
 
 <div id="loginScreen">
   <div class="login-box">
-    <div class="login-brand">MASTER<em>BOT</em><sup>v7.8</sup></div>
+    <div class="login-brand">MASTER<em>BOT</em><sup>v7.9</sup></div>
     <div class="login-sub">Acesso Restrito · Trading Platform</div>
     <div class="login-field">
       <label>Login</label>
@@ -554,7 +554,7 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
 <div id="appContent">
 <!-- ═══ TOPBAR ═══ -->
 <div class="topbar">
-  <div class="brand">MASTER<em>BOT</em><sup>v7.8</sup></div>
+  <div class="brand">MASTER<em>BOT</em><sup>v7.9</sup></div>
   <div class="chips" id="chips">
     <div class="chip active" data-sym="BTCUSDT" data-lbl="BTC">BTC</div>
     <div class="chip" data-sym="ETHUSDT" data-lbl="ETH">ETH</div>
@@ -2139,27 +2139,29 @@ function validatePrivKey(el){
 
 // Modo de credenciais diretas — bypassa o derive automático
 function onDirectCredsInput(){
-  const key=gv('apiKey');
-  const secret=gv('apiSecret');
-  const pass=gv('apiPass');
+  const key=(gv('apiKey')||'').trim();
+  const secret=(gv('apiSecret')||'').trim();
+  const pass=(gv('apiPass')||'').trim();
   if(key&&secret&&pass&&key.includes('-')&&secret.length>10&&pass.length>5){
-    // Credenciais completas — usar diretamente sem derive
     const funder=(gv('apiFunder')||'').trim();
-    if(!funder){log('⚠ Preencha também o Funder Address','w');return;}
+    if(!funder){log('⚠ Preencha o Funder Address','w');return;}
     _polyApiCreds={
-      apiKey:key.trim(),
-      secret:secret.trim(),
-      passphrase:pass.trim(),
-      walletAddress:funder, // sem signer — modo direto
-      funder:funder,
-      wallet:null
+      apiKey:key,secret,passphrase:pass,
+      walletAddress:funder,funder,wallet:null
     };
     _polyAuthFailed=false;
-    log('✅ Credenciais diretas configuradas · Key:'+key.slice(0,8)+'...','s');
+    log('✅ Credenciais diretas · Key:'+key.slice(0,8)+'...','s');
     updAPI();
-    setTimeout(()=>{testL2Auth();},500);
+    // Buscar saldo real
+    setTimeout(async()=>{
+      await checkPolyBalance();
+      await fetchPolyPrices();
+    },500);
   }
 }
+
+// apiConfigured também aceita modo direto (sem privKey)
+
 
 // ── Kline Open (referência do período) ──
 async function fetchKlineOpen(sym,tf,pStartMs){
@@ -2528,12 +2530,16 @@ setInterval(()=>{if(BU.running)inTimeWindow('u');if(BD.running)inTimeWindow('d')
 
 // ── API ──
 function apiConfigured(){
+  // Modo direto: key+secret+pass preenchidos
+  const key=(gv('apiKey')||'').trim();
+  const secret=(gv('apiSecret')||'').trim();
+  const pass=(gv('apiPass')||'').trim();
+  const fu=(gv('apiFunder')||'').trim();
+  if(key&&secret&&pass&&key.includes('-')&&secret.length>10&&fu.startsWith('0x'))return true;
+  // Modo normal: private key + funder
   let pk=(gv('apiPrivKey')||'').trim().replace(/[\s\n\r\t]/g,'');
-  let fu=(gv('apiFunder')||'').trim();
-  // Normalizar private key — remover 0x se presente
   if(pk.startsWith('0x')||pk.startsWith('0X'))pk=pk.slice(2);
   const pkOk=/^[0-9a-fA-F]{64}$/.test(pk);
-  // Funder: aceitar qualquer endereço Ethereum válido (42 chars com 0x)
   const fuOk=fu.startsWith('0x')&&fu.length>=40;
   return pkOk&&fuOk;
 }
@@ -3296,7 +3302,7 @@ function toggleTW(s){const el=g('twF'+s.toUpperCase());if(el)el.style.display=gc
 function toggleTP(s){const el=g('tpFld'+s.toUpperCase());if(el)el.style.display=gc('tpEn'+s.toUpperCase())?'block':'none';saveConfig();}
 
 // Auto-save on all config field changes
-const CFG_IDS=['apiPrivKey','apiFunder','tfU','tfD','modeU','modeD','tminU','tminD','tmaxU','tmaxD','slipU','slipD',
+const CFG_IDS=['apiPrivKey','apiFunder','apiKey','apiSecret','apiPass','tfU','tfD','modeU','modeD','tminU','tminD','tmaxU','tmaxD','slipU','slipD',
   'tpvU','tpvD','tpwU','tpwD','tavU','tavD','szU','szD','rnU','rnD','dlU','dlD',
   'slNU','slND','stU','stD','tpEnU','tpEnD','tpU','tpD','mlU','mlD','twU','twD',
   'twsU','tweU','twsD','tweD','upThresh','dnThresh','momWin',
@@ -3425,7 +3431,10 @@ function doLogin(){
     log(`Bem-vindo, ${NAMES[u]}!`,'s');
     // Start bot systems after login
     connectWS();
-    setTimeout(()=>{loadConfig();loadHistory();setupAutoSave();drawPnlChart('u');drawPnlChart('d');updAPI();if(apiConfigured())setTimeout(checkPolyBalance,1000);},300);
+    setTimeout(()=>{loadConfig();loadHistory();setupAutoSave();drawPnlChart('u');drawPnlChart('d');updAPI();// Restaurar modo direto se campos preenchidos
+const _k=gv('apiKey'),_s=gv('apiSecret'),_p=gv('apiPass'),_f=gv('apiFunder');
+if(_k&&_s&&_p&&_f){_polyApiCreds={apiKey:_k,secret:_s,passphrase:_p,walletAddress:_f,funder:_f,wallet:null};_polyAuthFailed=false;log('✅ Credenciais restauradas · '+_k.slice(0,8),'s');}
+if(apiConfigured())setTimeout(checkPolyBalance,1000);},300);
   }else{
     errEl.textContent='Login ou senha incorretos.';
     g('loginPass').value='';g('loginPass').focus();
@@ -3457,7 +3466,10 @@ function showUserChip(u){
     g('appContent').classList.add('unlocked');
     showUserChip(u);
     connectWS();
-    setTimeout(()=>{loadConfig();loadHistory();setupAutoSave();drawPnlChart('u');drawPnlChart('d');updAPI();if(apiConfigured())setTimeout(checkPolyBalance,1000);},300);
+    setTimeout(()=>{loadConfig();loadHistory();setupAutoSave();drawPnlChart('u');drawPnlChart('d');updAPI();// Restaurar modo direto se campos preenchidos
+const _k=gv('apiKey'),_s=gv('apiSecret'),_p=gv('apiPass'),_f=gv('apiFunder');
+if(_k&&_s&&_p&&_f){_polyApiCreds={apiKey:_k,secret:_s,passphrase:_p,walletAddress:_f,funder:_f,wallet:null};_polyAuthFailed=false;log('✅ Credenciais restauradas · '+_k.slice(0,8),'s');}
+if(apiConfigured())setTimeout(checkPolyBalance,1000);},300);
   }else{
     g('loginScreen').style.display='flex';
     setTimeout(()=>{const el=g('loginUser');if(el)el.focus();},200);
