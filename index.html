@@ -536,7 +536,7 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
 
 <div id="loginScreen">
   <div class="login-box">
-    <div class="login-brand">MASTER<em>BOT</em><sup>v8.1</sup></div>
+    <div class="login-brand">MASTER<em>BOT</em><sup>v8.2</sup></div>
     <div class="login-sub">Acesso Restrito · Trading Platform</div>
     <div class="login-field">
       <label>Login</label>
@@ -554,7 +554,7 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
 <div id="appContent">
 <!-- ═══ TOPBAR ═══ -->
 <div class="topbar">
-  <div class="brand">MASTER<em>BOT</em><sup>v8.1</sup></div>
+  <div class="brand">MASTER<em>BOT</em><sup>v8.2</sup></div>
   <div class="chips" id="chips">
     <div class="chip active" data-sym="BTCUSDT" data-lbl="BTC">BTC</div>
     <div class="chip" data-sym="ETHUSDT" data-lbl="ETH">ETH</div>
@@ -860,10 +860,13 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
                 <input type="text" id="apiKey" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" autocomplete="off"
                   style="font-family:'JetBrains Mono',monospace;font-size:8px;padding:4px 6px;background:var(--bg2);border:1px solid var(--b2);border-radius:4px;color:var(--txt);width:100%;margin-bottom:4px"
                   oninput="onDirectCredsInput()">
-                <label style="font-family:'JetBrains Mono',monospace;font-size:7px;color:var(--txt2)">SECRET</label>
-                <input type="password" id="apiSecret" placeholder="base64 secret..." autocomplete="off"
+                <div style="display:flex;justify-content:space-between;align-items:center">
+                  <label style="font-family:'JetBrains Mono',monospace;font-size:7px;color:var(--txt2)">SECRET</label>
+                  <span id="secretLen" style="font-family:'JetBrains Mono',monospace;font-size:7px;color:var(--txt3)">0 chars</span>
+                </div>
+                <input type="text" id="apiSecret" placeholder="base64 secret (44 chars)..." autocomplete="off"
                   style="font-family:'JetBrains Mono',monospace;font-size:8px;padding:4px 6px;background:var(--bg2);border:1px solid var(--b2);border-radius:4px;color:var(--txt);width:100%;margin-bottom:4px"
-                  oninput="onDirectCredsInput()">
+                  oninput="const sl=g('secretLen');if(sl)sl.textContent=this.value.length+' chars';onDirectCredsInput()">
                 <label style="font-family:'JetBrains Mono',monospace;font-size:7px;color:var(--txt2)">PASSPHRASE</label>
                 <input type="password" id="apiPass" placeholder="passphrase..." autocomplete="off"
                   style="font-family:'JetBrains Mono',monospace;font-size:8px;padding:4px 6px;background:var(--bg2);border:1px solid var(--b2);border-radius:4px;color:var(--txt);width:100%"
@@ -1648,43 +1651,50 @@ async function fetchPolyPrices(){
 
 
 // ── L2 HMAC-SHA256 Headers ──
-// Implementação fiel ao código oficial Polymarket clob-client/hmac.ts
 async function polyL2Headers(method,requestPath,body){
-  // body deve ser undefined para GET, string JSON para POST
   if(!_polyApiCreds)return null;
   try{
-    // Timestamp (usar servidor para evitar desync)
     let ts;
     try{
       const tr=await fetch(POLY_HOST+'/time',{signal:AbortSignal.timeout(2000)});
       if(tr.ok){const td=await tr.json();ts=String(Math.round(td.time||td.timestamp||Date.now()/1000));}
     }catch(e){}
     if(!ts)ts=String(Math.floor(Date.now()/1000));
-    
-    // CRÍTICO: body só incluído se !== undefined (igual ao código oficial)
+
+    const bodyStr=(body!==undefined)?body:'';
+    // CRÍTICO: body só incluído se !== undefined (igual ao oficial)
     let message=ts+method.toUpperCase()+requestPath;
-    if(body!==undefined){message+=body;}
-    
-    // Decodificar secret base64 → bytes (igual ao base64ToArrayBuffer oficial)
-    const secret=_polyApiCreds.secret;
-    let b64=secret.replace(/-/g,'+').replace(/_/g,'/');
-    const rem=b64.length%4;
-    if(rem===2)b64+='==';else if(rem===3)b64+='=';else if(rem===1)b64+='===';
-    const bin=atob(b64);
-    const keyBytes=new Uint8Array(bin.length);
-    for(let i=0;i<bin.length;i++)keyBytes[i]=bin.charCodeAt(i);
-    
-    const key=await crypto.subtle.importKey('raw',keyBytes,
-      {name:'HMAC',hash:'SHA-256'},false,['sign']);
-    const sigBytes=await crypto.subtle.sign('HMAC',key,new TextEncoder().encode(message));
-    
-    // Output: base64 PADRÃO (igual ao arrayBufferToBase64 oficial)
-    const sig=btoa(String.fromCharCode(...new Uint8Array(sigBytes)));
-    
-    // POLY_ADDRESS: funder se disponível, senão walletAddress
+    if(body!==undefined)message+=bodyStr;
+
+    const secret=_polyApiCreds.secret||'';
     const addr=_polyApiCreds.funder||_polyApiCreds.walletAddress;
-    log('🔐 L2: msg='+message.slice(0,50)+'... sig='+sig.slice(0,16),'i');
-    
+
+    // Se já sabemos qual variante funciona, usar diretamente
+    const mode=_polyApiCreds._workingMode||'try_all';
+
+    // Calcular ambas as variantes
+    async function hmac(keyBytes,msg){
+      const k=await crypto.subtle.importKey('raw',keyBytes,{name:'HMAC',hash:'SHA-256'},false,['sign']);
+      return new Uint8Array(await crypto.subtle.sign('HMAC',k,new TextEncoder().encode(msg)));
+    }
+    function toB64(bytes){return btoa(String.fromCharCode(...bytes));}
+
+    // Variante UTF-8 (secret como string direta)
+    const v_utf8=toB64(await hmac(new TextEncoder().encode(secret),message));
+
+    // Variante base64decode
+    let v_b64='';
+    try{
+      let b64=secret.replace(/-/g,'+').replace(/_/g,'/');
+      const r=b64.length%4;if(r===2)b64+='==';else if(r===3)b64+='=';else if(r===1)b64+='===';
+      const bin=atob(b64);const ba=new Uint8Array(bin.length);
+      for(let i=0;i<bin.length;i++)ba[i]=bin.charCodeAt(i);
+      v_b64=toB64(await hmac(ba,message));
+    }catch(e){}
+
+    // Usar a variante conhecida ou a utf8 como default
+    const sig=(mode==='b64'&&v_b64)?v_b64:v_utf8;
+
     return{
       'POLY_ADDRESS':addr,
       'POLY_SIGNATURE':sig,
@@ -1693,11 +1703,10 @@ async function polyL2Headers(method,requestPath,body){
       'POLY_PASSPHRASE':_polyApiCreds.passphrase,
       'Content-Type':'application/json'
     };
-  }catch(e){
-    log('L2 erro: '+e.message,'w');
-    return null;
-  }
+  }catch(e){log('L2 erro: '+e.message,'w');return null;}
 }
+
+
 
 
 
@@ -1753,6 +1762,8 @@ async function testL2Auth(){
       if(r.ok){
         log('🎯 FUNCIONOU: '+v.name,'s');
         _polyApiCreds._winVariant=v;
+        _polyApiCreds._workingMode=v.b64url?'b64url':(v.msg.includes(path+'')&&v.msg.length===ts.length+3+path.length?'utf8_nobody':'utf8');
+        log('💾 Modo guardado: '+_polyApiCreds._workingMode,'s');
         return;
       }
     }catch(e){log('❌ '+v.name+': '+e.message,'w');}
