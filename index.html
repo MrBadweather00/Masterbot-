@@ -536,7 +536,7 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
 
 <div id="loginScreen">
   <div class="login-box">
-    <div class="login-brand">MASTER<em>BOT</em><sup>v7.2</sup></div>
+    <div class="login-brand">MASTER<em>BOT</em><sup>v7.3</sup></div>
     <div class="login-sub">Acesso Restrito · Trading Platform</div>
     <div class="login-field">
       <label>Login</label>
@@ -554,7 +554,7 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
 <div id="appContent">
 <!-- ═══ TOPBAR ═══ -->
 <div class="topbar">
-  <div class="brand">MASTER<em>BOT</em><sup>v7.2</sup></div>
+  <div class="brand">MASTER<em>BOT</em><sup>v7.3</sup></div>
   <div class="chips" id="chips">
     <div class="chip active" data-sym="BTCUSDT" data-lbl="BTC">BTC</div>
     <div class="chip" data-sym="ETHUSDT" data-lbl="ETH">ETH</div>
@@ -1685,53 +1685,75 @@ async function polyL2Headers(method,requestPath,body=''){
   }
 }
 
-// Testar L2 auth com diferentes formatos de output
+// Testar L2 auth — todas as combinações de endereço × formato HMAC
 async function testL2Auth(){
-  if(!_polyApiCreds){log('Sem creds para testar','w');return;}
+  if(!_polyApiCreds){log('Sem creds','w');return;}
   const secret=_polyApiCreds.secret;
   const ts=String(Math.floor(Date.now()/1000));
   const path='/balance-allowance?asset_type=0';
-  const message=ts+'GET'+path+'';
-  const addr=_polyApiCreds.funder||_polyApiCreds.walletAddress;
+  const message=ts+'GET'+path;
   
-  log('🧪 Testando HMAC variants... secret length='+secret.length,'i');
+  log('🧪 secret='+secret.length+'chars | chave='+_polyApiCreds.apiKey.slice(0,8),'i');
+  log('🧪 walletAddr='+_polyApiCreds.walletAddress.slice(0,12),'i');
+  log('🧪 funder='+(_polyApiCreds.funder||'N/A').slice(0,12),'i');
   
-  // Variante 1: secret como UTF-8, output base64url
-  const v1bytes=new TextEncoder().encode(secret);
-  const v1key=await crypto.subtle.importKey('raw',v1bytes,{name:'HMAC',hash:'SHA-256'},false,['sign']);
-  const v1sig=await crypto.subtle.sign('HMAC',v1key,new TextEncoder().encode(message));
-  let v1=btoa(String.fromCharCode(...new Uint8Array(v1sig))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+  // Calcular todas as variantes de assinatura
+  const sigs={};
   
-  // Variante 2: secret base64url decoded, output base64url
-  let v2='';
+  // v1: secret UTF-8 → HMAC → base64url
+  const k1=await crypto.subtle.importKey('raw',new TextEncoder().encode(secret),
+    {name:'HMAC',hash:'SHA-256'},false,['sign']);
+  const s1=new Uint8Array(await crypto.subtle.sign('HMAC',k1,new TextEncoder().encode(message)));
+  sigs.utf8_b64url=btoa(String.fromCharCode(...s1)).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+  sigs.utf8_b64std=btoa(String.fromCharCode(...s1));
+  
+  // v2: secret base64url decoded → HMAC → base64url
   try{
     let b=secret.replace(/-/g,'+').replace(/_/g,'/');
-    const r=b.length%4;if(r===2)b+='==';else if(r===3)b+='=';
+    const r=b.length%4;if(r===2)b+='==';else if(r===3)b+='=';else if(r===1)b+='===';
     const bin=atob(b);const bArr=new Uint8Array(bin.length);
     for(let i=0;i<bin.length;i++)bArr[i]=bin.charCodeAt(i);
     const k2=await crypto.subtle.importKey('raw',bArr,{name:'HMAC',hash:'SHA-256'},false,['sign']);
-    const s2=await crypto.subtle.sign('HMAC',k2,new TextEncoder().encode(message));
-    v2=btoa(String.fromCharCode(...new Uint8Array(s2))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
-  }catch(e){v2='ERROR:'+e.message;}
+    const s2=new Uint8Array(await crypto.subtle.sign('HMAC',k2,new TextEncoder().encode(message)));
+    sigs.b64dec_b64url=btoa(String.fromCharCode(...s2)).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+    sigs.b64dec_b64std=btoa(String.fromCharCode(...s2));
+  }catch(e){sigs.b64dec_b64url='ERR';sigs.b64dec_b64std='ERR';}
   
-  // Variante 3: UTF-8, output base64 padrão
-  const v3sig=await crypto.subtle.sign('HMAC',v1key,new TextEncoder().encode(message));
-  const v3=btoa(String.fromCharCode(...new Uint8Array(v3sig)));
+  const addrs={
+    wallet:_polyApiCreds.walletAddress,
+    funder:_polyApiCreds.funder||_polyApiCreds.walletAddress
+  };
   
-  // Testar cada variante
-  for(const [name,sig] of [['v1:utf8+b64url',v1],['v2:b64dec+b64url',v2],['v3:utf8+b64std',v3]]){
-    try{
-      const r=await fetch(POLY_HOST+path,{headers:{
-        'POLY_ADDRESS':addr,'POLY_SIGNATURE':sig,'POLY_TIMESTAMP':ts,
-        'POLY_API_KEY':_polyApiCreds.apiKey,'POLY_PASSPHRASE':_polyApiCreds.passphrase,
-        'Content-Type':'application/json'
-      }});
-      const txt=await r.text();
-      log('🧪 '+name+': HTTP '+r.status+' '+txt.slice(0,80),(r.ok?'s':'w'));
-      if(r.ok){log('✅ HMAC funcionando com: '+name,'s');break;}
-    }catch(e){log('🧪 '+name+': ERRO '+e.message,'w');}
+  // Testar todas as combinações
+  for(const [aName,addr] of Object.entries(addrs)){
+    for(const [sName,sig] of Object.entries(sigs)){
+      if(sig==='ERR')continue;
+      try{
+        const r=await fetch(POLY_HOST+path,{
+          signal:AbortSignal.timeout(5000),
+          headers:{
+            'POLY_ADDRESS':addr,'POLY_SIGNATURE':sig,'POLY_TIMESTAMP':ts,
+            'POLY_API_KEY':_polyApiCreds.apiKey,'POLY_PASSPHRASE':_polyApiCreds.passphrase,
+            'Content-Type':'application/json'
+          }
+        });
+        const txt=await r.text();
+        const ok=r.ok;
+        log((ok?'✅':'❌')+' addr='+aName+' sig='+sName+': HTTP '+r.status+(ok?' → '+txt.slice(0,60):''),ok?'s':'w');
+        if(ok){
+          log('🎯 ENCONTRADO! Usando addr='+aName+' sig='+sName,'s');
+          // Salvar configuração vencedora
+          _polyApiCreds._l2AddrMode=aName;
+          _polyApiCreds._l2SigMode=sName;
+          return {addr,sig,ts};
+        }
+      }catch(e){log('❌ addr='+aName+' sig='+sName+': '+e.message,'w');}
+    }
   }
+  log('⚠ Nenhuma combinação funcionou. Problema pode ser outro.','e');
 }
+
+
 
 
 
