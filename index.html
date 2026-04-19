@@ -536,7 +536,7 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
 
 <div id="loginScreen">
   <div class="login-box">
-    <div class="login-brand">MASTER<em>BOT</em><sup>v8.7</sup></div>
+    <div class="login-brand">MASTER<em>BOT</em><sup>v8.8</sup></div>
     <div class="login-sub">Acesso Restrito · Trading Platform</div>
     <div class="login-field">
       <label>Login</label>
@@ -554,7 +554,7 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
 <div id="appContent">
 <!-- ═══ TOPBAR ═══ -->
 <div class="topbar">
-  <div class="brand">MASTER<em>BOT</em><sup>v8.7</sup></div>
+  <div class="brand">MASTER<em>BOT</em><sup>v8.8</sup></div>
   <div class="chips" id="chips">
     <div class="chip active" data-sym="BTCUSDT" data-lbl="BTC">BTC</div>
     <div class="chip" data-sym="ETHUSDT" data-lbl="ETH">ETH</div>
@@ -1658,54 +1658,39 @@ async function fetchPolyPrices(){
 
 
 // ── L2 HMAC-SHA256 Headers ──
+// Implementação exacta confirmada pelo Replit/py-clob-client
 async function polyL2Headers(method,requestPath,body){
   if(!_polyApiCreds)return null;
   try{
-    let ts;
-    try{
-      const tr=await fetch(POLY_HOST+'/time',{signal:AbortSignal.timeout(2000)});
-      if(tr.ok){const td=await tr.json();ts=String(Math.round(td.time||td.timestamp||Date.now()/1000));}
-    }catch(e){}
-    if(!ts)ts=String(Math.floor(Date.now()/1000));
-
-    const bodyStr=(body!==undefined)?body:'';
-    // CRÍTICO: assinar só o path BASE sem query string (confirmado pelo Replit)
+    const ts=String(Math.floor(Date.now()/1000));
+    
+    // HMAC assina: timestamp + METHOD + path_SEM_query_string
     const pathBase=requestPath.split('?')[0];
-    let message=ts+method.toUpperCase()+pathBase;
-    if(body!==undefined)message+=bodyStr;
-
+    const message=ts+method.toUpperCase()+pathBase;
+    // body só incluído se !== undefined (para POST com body)
+    // Para GET: message = ts+METHOD+path apenas
+    
+    // Secret: base64url decode → raw bytes
     const secret=_polyApiCreds.secret||'';
-    const addr=_polyApiCreds.walletAddress; // signer = POLY_ADDRESS (Replit confirmou)
-
-    // Se já sabemos qual variante funciona, usar diretamente
-    const mode=_polyApiCreds._workingMode||'try_all';
-
-    // Calcular ambas as variantes
-    async function hmac(keyBytes,msg){
-      const k=await crypto.subtle.importKey('raw',keyBytes,{name:'HMAC',hash:'SHA-256'},false,['sign']);
-      return new Uint8Array(await crypto.subtle.sign('HMAC',k,new TextEncoder().encode(msg)));
-    }
-    function toB64(bytes){return btoa(String.fromCharCode(...bytes));}
-
-    // Variante UTF-8 (secret como string direta)
-    // base64url COM padding (formato correcto Polymarket)
-    function toB64url(bytes){let s=btoa(String.fromCharCode(...bytes));return s.replace(/\+/g,'-').replace(/\//g,'_');} // mantém =
-    const v_utf8=toB64url(await hmac(new TextEncoder().encode(secret),message));
-
-    // Variante base64decode
-    let v_b64='';
-    try{
-      let b64=secret.replace(/-/g,'+').replace(/_/g,'/');
-      const r=b64.length%4;if(r===2)b64+='==';else if(r===3)b64+='=';else if(r===1)b64+='===';
-      const bin=atob(b64);const ba=new Uint8Array(bin.length);
-      for(let i=0;i<bin.length;i++)ba[i]=bin.charCodeAt(i);
-      v_b64=toB64url(await hmac(ba,message));
-    }catch(e){}
-
-    // Usar a variante conhecida ou a utf8 como default
-    // Usar b64 decode + base64url COM padding
-    const sig=(v_b64)?v_b64:v_utf8;
-
+    let b64=secret.replace(/-/g,'+').replace(/_/g,'/');
+    const r=b64.length%4;
+    if(r===2)b64+='==';else if(r===3)b64+='=';
+    const bin=atob(b64);
+    const keyBytes=new Uint8Array(bin.length);
+    for(let i=0;i<bin.length;i++)keyBytes[i]=bin.charCodeAt(i);
+    
+    const key=await crypto.subtle.importKey('raw',keyBytes,
+      {name:'HMAC',hash:'SHA-256'},false,['sign']);
+    const msgToSign=(body!==undefined)?message+body:message;
+    const sigBuf=await crypto.subtle.sign('HMAC',key,new TextEncoder().encode(msgToSign));
+    
+    // Output: base64url COM padding (=) — confirmado pelo Replit
+    const sig=btoa(String.fromCharCode(...new Uint8Array(sigBuf)))
+      .replace(/\+/g,'-').replace(/\//g,'_');
+    
+    const addr=_polyApiCreds.walletAddress; // signer address
+    log('🔐 ts='+ts+' path='+pathBase+' sig='+sig.slice(0,16)+'...','i');
+    
     return{
       'POLY_ADDRESS':addr,
       'POLY_SIGNATURE':sig,
@@ -1716,6 +1701,8 @@ async function polyL2Headers(method,requestPath,body){
     };
   }catch(e){log('L2 erro: '+e.message,'w');return null;}
 }
+
+
 
 
 
