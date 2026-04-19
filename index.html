@@ -536,7 +536,7 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
 
 <div id="loginScreen">
   <div class="login-box">
-    <div class="login-brand">MASTER<em>BOT</em><sup>v7.9</sup></div>
+    <div class="login-brand">MASTER<em>BOT</em><sup>v8.1</sup></div>
     <div class="login-sub">Acesso Restrito · Trading Platform</div>
     <div class="login-field">
       <label>Login</label>
@@ -554,7 +554,7 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
 <div id="appContent">
 <!-- ═══ TOPBAR ═══ -->
 <div class="topbar">
-  <div class="brand">MASTER<em>BOT</em><sup>v7.9</sup></div>
+  <div class="brand">MASTER<em>BOT</em><sup>v8.1</sup></div>
   <div class="chips" id="chips">
     <div class="chip active" data-sym="BTCUSDT" data-lbl="BTC">BTC</div>
     <div class="chip" data-sym="ETHUSDT" data-lbl="ETH">ETH</div>
@@ -3367,6 +3367,20 @@ function loadConfig(){
       document.querySelectorAll('#dp'+s.toUpperCase()+' .day-btn').forEach(b=>{b.classList.toggle('active',days.includes(b.dataset.day));});
     });
     log('⚙ Configurações restauradas','i');
+
+    // Restaurar credenciais diretas automaticamente após carregar config
+    setTimeout(()=>{
+      const _k=(gv('apiKey')||'').trim();
+      const _s=(gv('apiSecret')||'').trim();
+      const _p=(gv('apiPass')||'').trim();
+      const _f=(gv('apiFunder')||'').trim();
+      if(_k&&_s&&_p&&_f&&_k.includes('-')&&_s.length>10){
+        _polyApiCreds={apiKey:_k,secret:_s,passphrase:_p,walletAddress:_f,funder:_f,wallet:null};
+        _polyAuthFailed=false;
+        log('✅ Credenciais restauradas: '+_k.slice(0,8)+'...','s');
+        updAPI();
+      }
+    },100);
   }catch(e){}
 }
 
