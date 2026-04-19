@@ -536,7 +536,7 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
 
 <div id="loginScreen">
   <div class="login-box">
-    <div class="login-brand">MASTER<em>BOT</em><sup>v8.3</sup></div>
+    <div class="login-brand">MASTER<em>BOT</em><sup>v8.5</sup></div>
     <div class="login-sub">Acesso Restrito · Trading Platform</div>
     <div class="login-field">
       <label>Login</label>
@@ -554,7 +554,7 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
 <div id="appContent">
 <!-- ═══ TOPBAR ═══ -->
 <div class="topbar">
-  <div class="brand">MASTER<em>BOT</em><sup>v8.3</sup></div>
+  <div class="brand">MASTER<em>BOT</em><sup>v8.5</sup></div>
   <div class="chips" id="chips">
     <div class="chip active" data-sym="BTCUSDT" data-lbl="BTC">BTC</div>
     <div class="chip" data-sym="ETHUSDT" data-lbl="ETH">ETH</div>
@@ -1687,7 +1687,9 @@ async function polyL2Headers(method,requestPath,body){
     function toB64(bytes){return btoa(String.fromCharCode(...bytes));}
 
     // Variante UTF-8 (secret como string direta)
-    const v_utf8=toB64(await hmac(new TextEncoder().encode(secret),message));
+    // base64url COM padding (formato correcto Polymarket)
+    function toB64url(bytes){let s=btoa(String.fromCharCode(...bytes));return s.replace(/\+/g,'-').replace(/\//g,'_');} // mantém =
+    const v_utf8=toB64url(await hmac(new TextEncoder().encode(secret),message));
 
     // Variante base64decode
     let v_b64='';
@@ -1696,11 +1698,12 @@ async function polyL2Headers(method,requestPath,body){
       const r=b64.length%4;if(r===2)b64+='==';else if(r===3)b64+='=';else if(r===1)b64+='===';
       const bin=atob(b64);const ba=new Uint8Array(bin.length);
       for(let i=0;i<bin.length;i++)ba[i]=bin.charCodeAt(i);
-      v_b64=toB64(await hmac(ba,message));
+      v_b64=toB64url(await hmac(ba,message));
     }catch(e){}
 
     // Usar a variante conhecida ou a utf8 como default
-    const sig=(mode==='b64'&&v_b64)?v_b64:v_utf8;
+    // Usar b64 decode + base64url COM padding
+    const sig=(v_b64)?v_b64:v_utf8;
 
     return{
       'POLY_ADDRESS':addr,
@@ -1754,7 +1757,7 @@ async function testL2Auth(){
   for(const v of variants){
     const sigBytes=new Uint8Array(await crypto.subtle.sign('HMAC',cryptoKey,new TextEncoder().encode(v.msg)));
     let sig=btoa(String.fromCharCode(...sigBytes));
-    if(v.b64url)sig=sig.replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+    if(v.b64url)sig=sig.replace(/\+/g,'-').replace(/\//g,'_'); // mantém =
     try{
       const r=await fetch(POLY_HOST+path,{
         signal:AbortSignal.timeout(4000),
