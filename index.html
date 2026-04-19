@@ -536,7 +536,7 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
 
 <div id="loginScreen">
   <div class="login-box">
-    <div class="login-brand">MASTER<em>BOT</em><sup>v9.3</sup></div>
+    <div class="login-brand">MASTER<em>BOT</em><sup>v9.4</sup></div>
     <div class="login-sub">Acesso Restrito · Trading Platform</div>
     <div class="login-field">
       <label>Login</label>
@@ -554,7 +554,7 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
 <div id="appContent">
 <!-- ═══ TOPBAR ═══ -->
 <div class="topbar">
-  <div class="brand">MASTER<em>BOT</em><sup>v9.3</sup></div>
+  <div class="brand">MASTER<em>BOT</em><sup>v9.4</sup></div>
   <div class="chips" id="chips">
     <div class="chip active" data-sym="BTCUSDT" data-lbl="BTC">BTC</div>
     <div class="chip" data-sym="ETHUSDT" data-lbl="ETH">ETH</div>
@@ -2308,12 +2308,16 @@ function onTick(price,ts){
       if(!B.periodStart||B.periodStart<pStart){
         B.periodOpen=price;B.periodStart=pStart;
         if(B.running)log(`DRBot ${s==='u'?'UP':'DOWN'} novo período · ref: $${price.toFixed(2)}`,'i');
+        // Actualizar tokenId e preços da Polymarket a cada período
+        if(s==='u')fetchPolyPrices();
       }
     }
   });
 
   renderPrice();renderMkt();renderEdge();drawEChart();updSrcLabel();updDelta();
   updTrigStatus('u');updTrigStatus('d');
+  // Garantir que temos tokenId actualizado
+  if(apiConfigured()&&!P.upTokenId&&!P.fetching)fetchPolyPrices();
   if(BU.running&&!BU.inTrade&&!_gLock)executeTrade(BU);
   if(BD.running&&!BD.inTrade&&!_gLock)executeTrade(BD);
 }
@@ -2714,7 +2718,7 @@ function updatePeriodStatus(){
 setInterval(updatePeriodStatus,1000);
 
 // ── TRADE ENGINE ──
-function executeTrade(B){
+async function executeTrade(B){
   const s=B.dir;
   // Proteção atômica contra dupla entrada (race condition entre ticks)
   if(B._entering||B.inTrade)return;
@@ -2824,6 +2828,11 @@ function executeTrade(B){
   log(`${tag} ${actualDir} #${B.rounds} ${et} ENTRADA ${Math.round(polyP*100)}¢[${polySource}] @${entryTime} · Δ${entryDiff>=0?'+':''}$${entryDiff} · fecha em ${ml}:${sl2}`,'w');
 
   // Guardar se foi real para usar no resultado
+  // Se não temos tokenId, tentar buscar agora
+  if(apiConfigured()&&!P.upTokenId&&!P.fetching){
+    log('🔄 Buscando tokenId antes da ordem...','i');
+    await fetchPolyPrices();
+  }
   const _wasReal=apiConfigured()&&!!(s==='u'?P.upTokenId:P.dnTokenId);
   // EXECUÇÃO REAL — se API configurada, postar ordem na Polymarket
   if(_wasReal){
