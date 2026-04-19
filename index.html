@@ -536,7 +536,7 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
 
 <div id="loginScreen">
   <div class="login-box">
-    <div class="login-brand">MASTER<em>BOT</em><sup>v7.4</sup></div>
+    <div class="login-brand">MASTER<em>BOT</em><sup>v7.5</sup></div>
     <div class="login-sub">Acesso Restrito · Trading Platform</div>
     <div class="login-field">
       <label>Login</label>
@@ -554,7 +554,7 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
 <div id="appContent">
 <!-- ═══ TOPBAR ═══ -->
 <div class="topbar">
-  <div class="brand">MASTER<em>BOT</em><sup>v7.4</sup></div>
+  <div class="brand">MASTER<em>BOT</em><sup>v7.5</sup></div>
   <div class="chips" id="chips">
     <div class="chip active" data-sym="BTCUSDT" data-lbl="BTC">BTC</div>
     <div class="chip" data-sym="ETHUSDT" data-lbl="ETH">ETH</div>
@@ -1910,14 +1910,20 @@ async function polyDeriveCredentials(){
       {name:'address',type:'address'},{name:'timestamp',type:'string'},
       {name:'nonce',type:'uint256'},{name:'message',type:'string'}
     ]};
-    const msgValue={address:wallet.address,timestamp:ts,nonce,message:'This message attests that I control the given wallet'};
+    // Para Magic Wallet: o campo "address" no EIP-712 deve ser o funder (proxy wallet)
+    const funderForSig=(gv('apiFunder')||'').trim()||wallet.address;
+    const msgValue={address:funderForSig,timestamp:ts,nonce,message:'This message attests that I control the given wallet'};
+    log('EIP-712 address: '+funderForSig.slice(0,12)+'...','i');
     log('🔏 Assinando EIP-712...','i');
     const sig=await wallet._signTypedData(domain,types,msgValue);
     log('✓ Assinatura OK — buscando credenciais...','i');
     const funder=(gv('apiFunder')||'').trim()||wallet.address;
-    const authHeaders={'POLY_ADDRESS':wallet.address,'POLY_SIGNATURE':sig,'POLY_TIMESTAMP':ts,'POLY_NONCE':String(nonce),'Content-Type':'application/json'};
+    // Para Magic Wallet: POLY_ADDRESS = funder (proxy/profile), não o signer EOA
+    const funderAddr=(gv('apiFunder')||'').trim()||wallet.address;
+    const authHeaders={'POLY_ADDRESS':funderAddr,'POLY_SIGNATURE':sig,'POLY_TIMESTAMP':ts,'POLY_NONCE':String(nonce),'Content-Type':'application/json'};
+    log('L1 POLY_ADDRESS: '+funderAddr.slice(0,12)+'... (funder)','i');
     
-    // Criar chave com nonce=1 (nonce=0 já usada e secret perdido)
+    // Criar chave com nonce=1
     log('🔑 Criando chave com nonce=1...','i');
     let credsRes=await fetch(`${POLY_HOST}/auth/api-key`,{
       method:'POST',headers:authHeaders,body:JSON.stringify({})
