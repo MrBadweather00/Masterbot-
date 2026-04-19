@@ -536,7 +536,7 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
 
 <div id="loginScreen">
   <div class="login-box">
-    <div class="login-brand">MASTER<em>BOT</em><sup>v8.8</sup></div>
+    <div class="login-brand">MASTER<em>BOT</em><sup>v8.9</sup></div>
     <div class="login-sub">Acesso Restrito · Trading Platform</div>
     <div class="login-field">
       <label>Login</label>
@@ -554,7 +554,7 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
 <div id="appContent">
 <!-- ═══ TOPBAR ═══ -->
 <div class="topbar">
-  <div class="brand">MASTER<em>BOT</em><sup>v8.8</sup></div>
+  <div class="brand">MASTER<em>BOT</em><sup>v8.9</sup></div>
   <div class="chips" id="chips">
     <div class="chip active" data-sym="BTCUSDT" data-lbl="BTC">BTC</div>
     <div class="chip" data-sym="ETHUSDT" data-lbl="ETH">ETH</div>
@@ -1658,49 +1658,43 @@ async function fetchPolyPrices(){
 
 
 // ── L2 HMAC-SHA256 Headers ──
-// Implementação exacta confirmada pelo Replit/py-clob-client
-async function polyL2Headers(method,requestPath,body){
-  if(!_polyApiCreds)return null;
+// Assinatura feita pelo servidor Replit (HMAC garantido correcto)
+const SIGN_SERVER = 'https://402c96da-3756-42f1-9277-b9defe4eec42-00-4w9h746o4e99.picard.replit.dev/sign';
+
+async function polyL2Headers(method, requestPath, body){
+  if(!_polyApiCreds) return null;
   try{
-    const ts=String(Math.floor(Date.now()/1000));
-    
-    // HMAC assina: timestamp + METHOD + path_SEM_query_string
-    const pathBase=requestPath.split('?')[0];
-    const message=ts+method.toUpperCase()+pathBase;
-    // body só incluído se !== undefined (para POST com body)
-    // Para GET: message = ts+METHOD+path apenas
-    
-    // Secret: base64url decode → raw bytes
-    const secret=_polyApiCreds.secret||'';
-    let b64=secret.replace(/-/g,'+').replace(/_/g,'/');
-    const r=b64.length%4;
-    if(r===2)b64+='==';else if(r===3)b64+='=';
-    const bin=atob(b64);
-    const keyBytes=new Uint8Array(bin.length);
-    for(let i=0;i<bin.length;i++)keyBytes[i]=bin.charCodeAt(i);
-    
-    const key=await crypto.subtle.importKey('raw',keyBytes,
-      {name:'HMAC',hash:'SHA-256'},false,['sign']);
-    const msgToSign=(body!==undefined)?message+body:message;
-    const sigBuf=await crypto.subtle.sign('HMAC',key,new TextEncoder().encode(msgToSign));
-    
-    // Output: base64url COM padding (=) — confirmado pelo Replit
-    const sig=btoa(String.fromCharCode(...new Uint8Array(sigBuf)))
-      .replace(/\+/g,'-').replace(/\//g,'_');
-    
-    const addr=_polyApiCreds.walletAddress; // signer address
-    log('🔐 ts='+ts+' path='+pathBase+' sig='+sig.slice(0,16)+'...','i');
-    
-    return{
-      'POLY_ADDRESS':addr,
-      'POLY_SIGNATURE':sig,
-      'POLY_TIMESTAMP':ts,
-      'POLY_API_KEY':_polyApiCreds.apiKey,
-      'POLY_PASSPHRASE':_polyApiCreds.passphrase,
-      'Content-Type':'application/json'
+    const payload = {
+      method: method.toUpperCase(),
+      path: requestPath.split('?')[0], // path sem query string
+      body: (body !== undefined) ? body : null
     };
-  }catch(e){log('L2 erro: '+e.message,'w');return null;}
+    
+    const res = await fetch(SIGN_SERVER, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(5000)
+    });
+    
+    if(!res.ok) throw new Error('Sign server HTTP ' + res.status);
+    const h = await res.json();
+    
+    // Sobrepor com as credenciais locais (API key pode ter mudado)
+    h['POLY_API_KEY'] = _polyApiCreds.apiKey;
+    h['POLY_PASSPHRASE'] = _polyApiCreds.passphrase;
+    h['POLY_ADDRESS'] = _polyApiCreds.walletAddress;
+    h['Content-Type'] = 'application/json';
+    
+    log('🔐 Replit sign OK · ts=' + h['POLY_TIMESTAMP'] + ' sig=' + h['POLY_SIGNATURE'].slice(0,16) + '...', 'i');
+    return h;
+  } catch(e) {
+    log('❌ Sign server erro: ' + e.message, 'w');
+    return null;
+  }
 }
+
+
 
 
 
