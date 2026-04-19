@@ -536,7 +536,7 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
 
 <div id="loginScreen">
   <div class="login-box">
-    <div class="login-brand">MASTER<em>BOT</em><sup>v8.9</sup></div>
+    <div class="login-brand">MASTER<em>BOT</em><sup>v9.0</sup></div>
     <div class="login-sub">Acesso Restrito · Trading Platform</div>
     <div class="login-field">
       <label>Login</label>
@@ -554,7 +554,7 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
 <div id="appContent">
 <!-- ═══ TOPBAR ═══ -->
 <div class="topbar">
-  <div class="brand">MASTER<em>BOT</em><sup>v8.9</sup></div>
+  <div class="brand">MASTER<em>BOT</em><sup>v9.0</sup></div>
   <div class="chips" id="chips">
     <div class="chip active" data-sym="BTCUSDT" data-lbl="BTC">BTC</div>
     <div class="chip" data-sym="ETHUSDT" data-lbl="ETH">ETH</div>
@@ -1680,10 +1680,7 @@ async function polyL2Headers(method, requestPath, body){
     if(!res.ok) throw new Error('Sign server HTTP ' + res.status);
     const h = await res.json();
     
-    // Sobrepor com as credenciais locais (API key pode ter mudado)
-    h['POLY_API_KEY'] = _polyApiCreds.apiKey;
-    h['POLY_PASSPHRASE'] = _polyApiCreds.passphrase;
-    h['POLY_ADDRESS'] = _polyApiCreds.walletAddress;
+    // Usar headers exactamente como o Replit devolve (não sobrepor)
     h['Content-Type'] = 'application/json';
     
     log('🔐 Replit sign OK · ts=' + h['POLY_TIMESTAMP'] + ' sig=' + h['POLY_SIGNATURE'].slice(0,16) + '...', 'i');
