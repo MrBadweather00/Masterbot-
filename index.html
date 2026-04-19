@@ -536,7 +536,7 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
 
 <div id="loginScreen">
   <div class="login-box">
-    <div class="login-brand">MASTER<em>BOT</em><sup>v8.6</sup></div>
+    <div class="login-brand">MASTER<em>BOT</em><sup>v8.7</sup></div>
     <div class="login-sub">Acesso Restrito · Trading Platform</div>
     <div class="login-field">
       <label>Login</label>
@@ -554,7 +554,7 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
 <div id="appContent">
 <!-- ═══ TOPBAR ═══ -->
 <div class="topbar">
-  <div class="brand">MASTER<em>BOT</em><sup>v8.6</sup></div>
+  <div class="brand">MASTER<em>BOT</em><sup>v8.7</sup></div>
   <div class="chips" id="chips">
     <div class="chip active" data-sym="BTCUSDT" data-lbl="BTC">BTC</div>
     <div class="chip" data-sym="ETHUSDT" data-lbl="ETH">ETH</div>
@@ -1675,7 +1675,7 @@ async function polyL2Headers(method,requestPath,body){
     if(body!==undefined)message+=bodyStr;
 
     const secret=_polyApiCreds.secret||'';
-    const addr=_polyApiCreds.funder||_polyApiCreds.walletAddress;
+    const addr=_polyApiCreds.walletAddress; // signer = POLY_ADDRESS (Replit confirmou)
 
     // Se já sabemos qual variante funciona, usar diretamente
     const mode=_polyApiCreds._workingMode||'try_all';
