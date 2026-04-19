@@ -536,7 +536,7 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
 
 <div id="loginScreen">
   <div class="login-box">
-    <div class="login-brand">MASTER<em>BOT</em><sup>v7.5</sup></div>
+    <div class="login-brand">MASTER<em>BOT</em><sup>v7.6</sup></div>
     <div class="login-sub">Acesso Restrito · Trading Platform</div>
     <div class="login-field">
       <label>Login</label>
@@ -554,7 +554,7 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
 <div id="appContent">
 <!-- ═══ TOPBAR ═══ -->
 <div class="topbar">
-  <div class="brand">MASTER<em>BOT</em><sup>v7.5</sup></div>
+  <div class="brand">MASTER<em>BOT</em><sup>v7.6</sup></div>
   <div class="chips" id="chips">
     <div class="chip active" data-sym="BTCUSDT" data-lbl="BTC">BTC</div>
     <div class="chip" data-sym="ETHUSDT" data-lbl="ETH">ETH</div>
@@ -1910,10 +1910,9 @@ async function polyDeriveCredentials(){
       {name:'address',type:'address'},{name:'timestamp',type:'string'},
       {name:'nonce',type:'uint256'},{name:'message',type:'string'}
     ]};
-    // Para Magic Wallet: o campo "address" no EIP-712 deve ser o funder (proxy wallet)
-    const funderForSig=(gv('apiFunder')||'').trim()||wallet.address;
-    const msgValue={address:funderForSig,timestamp:ts,nonce,message:'This message attests that I control the given wallet'};
-    log('EIP-712 address: '+funderForSig.slice(0,12)+'...','i');
+    // EIP-712: address = wallet.address (EOA que assina — não pode ser ENS ou proxy)
+    const msgValue={address:wallet.address,timestamp:ts,nonce,message:'This message attests that I control the given wallet'};
+    log('EIP-712 address: '+wallet.address.slice(0,12)+'... (signer EOA)','i');
     log('🔏 Assinando EIP-712...','i');
     const sig=await wallet._signTypedData(domain,types,msgValue);
     log('✓ Assinatura OK — buscando credenciais...','i');
