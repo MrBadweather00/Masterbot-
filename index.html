@@ -536,7 +536,7 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
 
 <div id="loginScreen">
   <div class="login-box">
-    <div class="login-brand">MASTER<em>BOT</em><sup>v7.6</sup></div>
+    <div class="login-brand">MASTER<em>BOT</em><sup>v7.7</sup></div>
     <div class="login-sub">Acesso Restrito · Trading Platform</div>
     <div class="login-field">
       <label>Login</label>
@@ -554,7 +554,7 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
 <div id="appContent">
 <!-- ═══ TOPBAR ═══ -->
 <div class="topbar">
-  <div class="brand">MASTER<em>BOT</em><sup>v7.6</sup></div>
+  <div class="brand">MASTER<em>BOT</em><sup>v7.7</sup></div>
   <div class="chips" id="chips">
     <div class="chip active" data-sym="BTCUSDT" data-lbl="BTC">BTC</div>
     <div class="chip" data-sym="ETHUSDT" data-lbl="ETH">ETH</div>
@@ -1917,10 +1917,9 @@ async function polyDeriveCredentials(){
     const sig=await wallet._signTypedData(domain,types,msgValue);
     log('✓ Assinatura OK — buscando credenciais...','i');
     const funder=(gv('apiFunder')||'').trim()||wallet.address;
-    // Para Magic Wallet: POLY_ADDRESS = funder (proxy/profile), não o signer EOA
-    const funderAddr=(gv('apiFunder')||'').trim()||wallet.address;
-    const authHeaders={'POLY_ADDRESS':funderAddr,'POLY_SIGNATURE':sig,'POLY_TIMESTAMP':ts,'POLY_NONCE':String(nonce),'Content-Type':'application/json'};
-    log('L1 POLY_ADDRESS: '+funderAddr.slice(0,12)+'... (funder)','i');
+    // L1: POLY_ADDRESS = wallet.address (o endereço que assinou o EIP-712)
+    const authHeaders={'POLY_ADDRESS':wallet.address,'POLY_SIGNATURE':sig,'POLY_TIMESTAMP':ts,'POLY_NONCE':String(nonce),'Content-Type':'application/json'};
+    log('L1 POLY_ADDRESS: '+wallet.address.slice(0,12)+'... (signer)','i');
     
     // Criar chave com nonce=1
     log('🔑 Criando chave com nonce=1...','i');
