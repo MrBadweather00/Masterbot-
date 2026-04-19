@@ -536,7 +536,7 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
 
 <div id="loginScreen">
   <div class="login-box">
-    <div class="login-brand">MASTER<em>BOT</em><sup>v7.1</sup></div>
+    <div class="login-brand">MASTER<em>BOT</em><sup>v7.2</sup></div>
     <div class="login-sub">Acesso Restrito · Trading Platform</div>
     <div class="login-field">
       <label>Login</label>
@@ -554,7 +554,7 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
 <div id="appContent">
 <!-- ═══ TOPBAR ═══ -->
 <div class="topbar">
-  <div class="brand">MASTER<em>BOT</em><sup>v7.1</sup></div>
+  <div class="brand">MASTER<em>BOT</em><sup>v7.2</sup></div>
   <div class="chips" id="chips">
     <div class="chip active" data-sym="BTCUSDT" data-lbl="BTC">BTC</div>
     <div class="chip" data-sym="ETHUSDT" data-lbl="ETH">ETH</div>
@@ -691,6 +691,7 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
         <div style="font-family:'JetBrains Mono',monospace;font-size:7px;color:var(--txt3);letter-spacing:1px">💰 SALDO POLYMARKET</div>
         <div style="display:flex;align-items:center;gap:6px;">
           <button onclick="polyAutoRedeem()" title="Resgatar wins automaticamente" style="padding:2px 7px;background:rgba(0,229,160,.15);border:1px solid var(--up);border-radius:4px;color:var(--up);font-size:7px;cursor:pointer;font-family:'JetBrains Mono',monospace">💸 Resgatar</button>
+          <button onclick="testL2Auth()" style="padding:2px 7px;background:rgba(100,100,255,.2);border:1px solid #6666ff;border-radius:4px;color:#aaaaff;font-size:7px;cursor:pointer;font-family:'JetBrains Mono',monospace">🧪 Testar</button>
           <button onclick="checkPolyBalance()" style="padding:2px 7px;background:var(--bg3);border:1px solid var(--b2);border-radius:4px;color:var(--txt2);font-size:8px;cursor:pointer;font-family:'JetBrains Mono',monospace">↺</button>
           <div style="font-family:'JetBrains Mono',monospace;font-size:7px;color:var(--up)" id="polyConnStatus">● REAL</div>
         </div>
@@ -1624,55 +1625,115 @@ async function fetchPolyPrices(){
 
 
 // ── L2 HMAC-SHA256 Headers ──
-// Formato: HMAC(base64url_decode(secret), timestamp + METHOD + path + body)
-// Output: base64url
 async function polyL2Headers(method,requestPath,body=''){
   if(!_polyApiCreds)return null;
   try{
-    // Usar timestamp do servidor se disponível (evitar desync de relógio)
+    // Timestamp do servidor
     let ts;
     try{
       const tr=await fetch(POLY_HOST+'/time',{signal:AbortSignal.timeout(2000)});
       if(tr.ok){const td=await tr.json();ts=String(Math.round(td.time||td.timestamp||Date.now()/1000));}
     }catch(e){}
     if(!ts)ts=String(Math.floor(Date.now()/1000));
+    
     const bodyStr=typeof body==='string'?body:(body?JSON.stringify(body):'');
     const message=ts+method.toUpperCase()+requestPath+bodyStr;
+    const secret=_polyApiCreds.secret;
     
-    // Decodificar secret (base64url) para bytes
-    let b64=_polyApiCreds.secret.replace(/-/g,'+').replace(/_/g,'/');
-    while(b64.length%4)b64+='=';
-    const bin=atob(b64);
-    const secretBytes=new Uint8Array(bin.length);
-    for(let i=0;i<bin.length;i++)secretBytes[i]=bin.charCodeAt(i);
+    // Tentar decodificar o secret como base64/base64url
+    // Se falhar, usar como UTF-8 direto
+    let secretBytes;
+    let secretMode='utf8';
+    try{
+      let b64=secret.replace(/-/g,'+').replace(/_/g,'/');
+      // Adicionar padding correto
+      const rem=b64.length%4;
+      if(rem===2)b64+='==';
+      else if(rem===3)b64+='=';
+      else if(rem===1)b64+='===';
+      const bin=atob(b64);
+      secretBytes=new Uint8Array(bin.length);
+      for(let i=0;i<bin.length;i++)secretBytes[i]=bin.charCodeAt(i);
+      secretMode='base64';
+    }catch(e){
+      secretBytes=new TextEncoder().encode(secret);
+    }
     
-    // HMAC-SHA256
     const key=await crypto.subtle.importKey('raw',secretBytes,
       {name:'HMAC',hash:'SHA-256'},false,['sign']);
-    const sigBytes=await crypto.subtle.sign('HMAC',key,new TextEncoder().encode(message));
+    const sigBytes=await crypto.subtle.sign('HMAC',key,
+      new TextEncoder().encode(message));
     
-    // Converter para base64url (sem padding, com - e _)
-    let sigB64=btoa(String.fromCharCode(...new Uint8Array(sigBytes)));
-    sigB64=sigB64.replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
-    log('🔐 L2: ts='+ts+' msg='+message.slice(0,60)+' sig='+sigB64.slice(0,20),'i');
+    // Output como base64url (sem padding)
+    let sig=btoa(String.fromCharCode(...new Uint8Array(sigBytes)));
+    sig=sig.replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
     
-    // Para Magic Wallet (signatureType=1):
-    // POLY_ADDRESS = funder (proxy/profile address), não o signer EOA
     const addrForL2=_polyApiCreds.funder||_polyApiCreds.walletAddress;
-    log('L2 addr: '+addrForL2.slice(0,12)+'... key:'+_polyApiCreds.apiKey.slice(0,8),'i');
+    log('🔐 L2['+secretMode+']: addr='+addrForL2.slice(0,8)+' key='+_polyApiCreds.apiKey.slice(0,8)+' sig='+sig.slice(0,16),'i');
+    
     return{
       'POLY_ADDRESS':addrForL2,
-      'POLY_SIGNATURE':sigB64,
+      'POLY_SIGNATURE':sig,
       'POLY_TIMESTAMP':ts,
       'POLY_API_KEY':_polyApiCreds.apiKey,
       'POLY_PASSPHRASE':_polyApiCreds.passphrase,
       'Content-Type':'application/json'
     };
   }catch(e){
-    log('L2 headers erro: '+e.message,'w');
+    log('L2 erro: '+e.message,'w');
     return null;
   }
 }
+
+// Testar L2 auth com diferentes formatos de output
+async function testL2Auth(){
+  if(!_polyApiCreds){log('Sem creds para testar','w');return;}
+  const secret=_polyApiCreds.secret;
+  const ts=String(Math.floor(Date.now()/1000));
+  const path='/balance-allowance?asset_type=0';
+  const message=ts+'GET'+path+'';
+  const addr=_polyApiCreds.funder||_polyApiCreds.walletAddress;
+  
+  log('🧪 Testando HMAC variants... secret length='+secret.length,'i');
+  
+  // Variante 1: secret como UTF-8, output base64url
+  const v1bytes=new TextEncoder().encode(secret);
+  const v1key=await crypto.subtle.importKey('raw',v1bytes,{name:'HMAC',hash:'SHA-256'},false,['sign']);
+  const v1sig=await crypto.subtle.sign('HMAC',v1key,new TextEncoder().encode(message));
+  let v1=btoa(String.fromCharCode(...new Uint8Array(v1sig))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+  
+  // Variante 2: secret base64url decoded, output base64url
+  let v2='';
+  try{
+    let b=secret.replace(/-/g,'+').replace(/_/g,'/');
+    const r=b.length%4;if(r===2)b+='==';else if(r===3)b+='=';
+    const bin=atob(b);const bArr=new Uint8Array(bin.length);
+    for(let i=0;i<bin.length;i++)bArr[i]=bin.charCodeAt(i);
+    const k2=await crypto.subtle.importKey('raw',bArr,{name:'HMAC',hash:'SHA-256'},false,['sign']);
+    const s2=await crypto.subtle.sign('HMAC',k2,new TextEncoder().encode(message));
+    v2=btoa(String.fromCharCode(...new Uint8Array(s2))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+  }catch(e){v2='ERROR:'+e.message;}
+  
+  // Variante 3: UTF-8, output base64 padrão
+  const v3sig=await crypto.subtle.sign('HMAC',v1key,new TextEncoder().encode(message));
+  const v3=btoa(String.fromCharCode(...new Uint8Array(v3sig)));
+  
+  // Testar cada variante
+  for(const [name,sig] of [['v1:utf8+b64url',v1],['v2:b64dec+b64url',v2],['v3:utf8+b64std',v3]]){
+    try{
+      const r=await fetch(POLY_HOST+path,{headers:{
+        'POLY_ADDRESS':addr,'POLY_SIGNATURE':sig,'POLY_TIMESTAMP':ts,
+        'POLY_API_KEY':_polyApiCreds.apiKey,'POLY_PASSPHRASE':_polyApiCreds.passphrase,
+        'Content-Type':'application/json'
+      }});
+      const txt=await r.text();
+      log('🧪 '+name+': HTTP '+r.status+' '+txt.slice(0,80),(r.ok?'s':'w'));
+      if(r.ok){log('✅ HMAC funcionando com: '+name,'s');break;}
+    }catch(e){log('🧪 '+name+': ERRO '+e.message,'w');}
+  }
+}
+
+
 
 // ── Executar ordem REAL na Polymarket ──
 async function polyPlaceOrder(tokenId,side,price,sizeUSDC){
