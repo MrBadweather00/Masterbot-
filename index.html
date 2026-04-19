@@ -536,7 +536,7 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
 
 <div id="loginScreen">
   <div class="login-box">
-    <div class="login-brand">MASTER<em>BOT</em><sup>v7.3</sup></div>
+    <div class="login-brand">MASTER<em>BOT</em><sup>v7.4</sup></div>
     <div class="login-sub">Acesso Restrito · Trading Platform</div>
     <div class="login-field">
       <label>Login</label>
@@ -554,7 +554,7 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
 <div id="appContent">
 <!-- ═══ TOPBAR ═══ -->
 <div class="topbar">
-  <div class="brand">MASTER<em>BOT</em><sup>v7.3</sup></div>
+  <div class="brand">MASTER<em>BOT</em><sup>v7.4</sup></div>
   <div class="chips" id="chips">
     <div class="chip active" data-sym="BTCUSDT" data-lbl="BTC">BTC</div>
     <div class="chip" data-sym="ETHUSDT" data-lbl="ETH">ETH</div>
@@ -1625,10 +1625,12 @@ async function fetchPolyPrices(){
 
 
 // ── L2 HMAC-SHA256 Headers ──
-async function polyL2Headers(method,requestPath,body=''){
+// Implementação fiel ao código oficial Polymarket clob-client/hmac.ts
+async function polyL2Headers(method,requestPath,body){
+  // body deve ser undefined para GET, string JSON para POST
   if(!_polyApiCreds)return null;
   try{
-    // Timestamp do servidor
+    // Timestamp (usar servidor para evitar desync)
     let ts;
     try{
       const tr=await fetch(POLY_HOST+'/time',{signal:AbortSignal.timeout(2000)});
@@ -1636,43 +1638,31 @@ async function polyL2Headers(method,requestPath,body=''){
     }catch(e){}
     if(!ts)ts=String(Math.floor(Date.now()/1000));
     
-    const bodyStr=typeof body==='string'?body:(body?JSON.stringify(body):'');
-    const message=ts+method.toUpperCase()+requestPath+bodyStr;
+    // CRÍTICO: body só incluído se !== undefined (igual ao código oficial)
+    let message=ts+method.toUpperCase()+requestPath;
+    if(body!==undefined){message+=body;}
+    
+    // Decodificar secret base64 → bytes (igual ao base64ToArrayBuffer oficial)
     const secret=_polyApiCreds.secret;
+    let b64=secret.replace(/-/g,'+').replace(/_/g,'/');
+    const rem=b64.length%4;
+    if(rem===2)b64+='==';else if(rem===3)b64+='=';else if(rem===1)b64+='===';
+    const bin=atob(b64);
+    const keyBytes=new Uint8Array(bin.length);
+    for(let i=0;i<bin.length;i++)keyBytes[i]=bin.charCodeAt(i);
     
-    // Tentar decodificar o secret como base64/base64url
-    // Se falhar, usar como UTF-8 direto
-    let secretBytes;
-    let secretMode='utf8';
-    try{
-      let b64=secret.replace(/-/g,'+').replace(/_/g,'/');
-      // Adicionar padding correto
-      const rem=b64.length%4;
-      if(rem===2)b64+='==';
-      else if(rem===3)b64+='=';
-      else if(rem===1)b64+='===';
-      const bin=atob(b64);
-      secretBytes=new Uint8Array(bin.length);
-      for(let i=0;i<bin.length;i++)secretBytes[i]=bin.charCodeAt(i);
-      secretMode='base64';
-    }catch(e){
-      secretBytes=new TextEncoder().encode(secret);
-    }
-    
-    const key=await crypto.subtle.importKey('raw',secretBytes,
+    const key=await crypto.subtle.importKey('raw',keyBytes,
       {name:'HMAC',hash:'SHA-256'},false,['sign']);
-    const sigBytes=await crypto.subtle.sign('HMAC',key,
-      new TextEncoder().encode(message));
+    const sigBytes=await crypto.subtle.sign('HMAC',key,new TextEncoder().encode(message));
     
-    // Output como base64url (sem padding)
-    let sig=btoa(String.fromCharCode(...new Uint8Array(sigBytes)));
-    sig=sig.replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+    // Output: base64 PADRÃO (igual ao arrayBufferToBase64 oficial)
+    const sig=btoa(String.fromCharCode(...new Uint8Array(sigBytes)));
     
-    const addrForL2=_polyApiCreds.funder||_polyApiCreds.walletAddress;
-    log('🔐 L2['+secretMode+']: addr='+addrForL2.slice(0,8)+' key='+_polyApiCreds.apiKey.slice(0,8)+' sig='+sig.slice(0,16),'i');
+    const addr=_polyApiCreds.walletAddress; // POLY_ADDRESS = signer address
+    log('🔐 L2: msg='+message.slice(0,50)+'... sig='+sig.slice(0,16),'i');
     
     return{
-      'POLY_ADDRESS':addrForL2,
+      'POLY_ADDRESS':addr,
       'POLY_SIGNATURE':sig,
       'POLY_TIMESTAMP':ts,
       'POLY_API_KEY':_polyApiCreds.apiKey,
@@ -1685,73 +1675,68 @@ async function polyL2Headers(method,requestPath,body=''){
   }
 }
 
-// Testar L2 auth — todas as combinações de endereço × formato HMAC
+
+
+// Testar L2 auth — implementação fiel ao oficial
 async function testL2Auth(){
   if(!_polyApiCreds){log('Sem creds','w');return;}
   const secret=_polyApiCreds.secret;
   const ts=String(Math.floor(Date.now()/1000));
   const path='/balance-allowance?asset_type=0';
-  const message=ts+'GET'+path;
   
-  log('🧪 secret='+secret.length+'chars | chave='+_polyApiCreds.apiKey.slice(0,8),'i');
-  log('🧪 walletAddr='+_polyApiCreds.walletAddress.slice(0,12),'i');
-  log('🧪 funder='+(_polyApiCreds.funder||'N/A').slice(0,12),'i');
+  log('🧪 Testando HMAC oficial: secret='+secret.length+'chars','i');
   
-  // Calcular todas as variantes de assinatura
-  const sigs={};
+  // Decodificar secret
+  let b64=secret.replace(/-/g,'+').replace(/_/g,'/');
+  const rem=b64.length%4;
+  if(rem===2)b64+='==';else if(rem===3)b64+='=';
+  const bin=atob(b64);
+  const keyBytes=new Uint8Array(bin.length);
+  for(let i=0;i<bin.length;i++)keyBytes[i]=bin.charCodeAt(i);
+  const cryptoKey=await crypto.subtle.importKey('raw',keyBytes,{name:'HMAC',hash:'SHA-256'},false,['sign']);
   
-  // v1: secret UTF-8 → HMAC → base64url
-  const k1=await crypto.subtle.importKey('raw',new TextEncoder().encode(secret),
-    {name:'HMAC',hash:'SHA-256'},false,['sign']);
-  const s1=new Uint8Array(await crypto.subtle.sign('HMAC',k1,new TextEncoder().encode(message)));
-  sigs.utf8_b64url=btoa(String.fromCharCode(...s1)).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
-  sigs.utf8_b64std=btoa(String.fromCharCode(...s1));
+  // Testar 4 variantes: (com/sem body) × (walletAddr/funder) × (base64/base64url output)
+  const walletAddr=_polyApiCreds.walletAddress;
+  const funderAddr=_polyApiCreds.funder||walletAddr;
   
-  // v2: secret base64url decoded → HMAC → base64url
-  try{
-    let b=secret.replace(/-/g,'+').replace(/_/g,'/');
-    const r=b.length%4;if(r===2)b+='==';else if(r===3)b+='=';else if(r===1)b+='===';
-    const bin=atob(b);const bArr=new Uint8Array(bin.length);
-    for(let i=0;i<bin.length;i++)bArr[i]=bin.charCodeAt(i);
-    const k2=await crypto.subtle.importKey('raw',bArr,{name:'HMAC',hash:'SHA-256'},false,['sign']);
-    const s2=new Uint8Array(await crypto.subtle.sign('HMAC',k2,new TextEncoder().encode(message)));
-    sigs.b64dec_b64url=btoa(String.fromCharCode(...s2)).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
-    sigs.b64dec_b64std=btoa(String.fromCharCode(...s2));
-  }catch(e){sigs.b64dec_b64url='ERR';sigs.b64dec_b64std='ERR';}
+  const variants=[
+    // msg sem body (GET correto), output base64 standard
+    {name:'noBody+b64std+wallet', msg:ts+'GET'+path, addr:walletAddr, b64url:false},
+    {name:'noBody+b64std+funder', msg:ts+'GET'+path, addr:funderAddr, b64url:false},
+    // msg sem body, output base64url
+    {name:'noBody+b64url+wallet', msg:ts+'GET'+path, addr:walletAddr, b64url:true},
+    {name:'noBody+b64url+funder', msg:ts+'GET'+path, addr:funderAddr, b64url:true},
+    // msg com body vazio string
+    {name:'emptyBody+b64std+wallet', msg:ts+'GET'+path+'', addr:walletAddr, b64url:false},
+    {name:'emptyBody+b64url+funder', msg:ts+'GET'+path+'', addr:funderAddr, b64url:true},
+  ];
   
-  const addrs={
-    wallet:_polyApiCreds.walletAddress,
-    funder:_polyApiCreds.funder||_polyApiCreds.walletAddress
-  };
-  
-  // Testar todas as combinações
-  for(const [aName,addr] of Object.entries(addrs)){
-    for(const [sName,sig] of Object.entries(sigs)){
-      if(sig==='ERR')continue;
-      try{
-        const r=await fetch(POLY_HOST+path,{
-          signal:AbortSignal.timeout(5000),
-          headers:{
-            'POLY_ADDRESS':addr,'POLY_SIGNATURE':sig,'POLY_TIMESTAMP':ts,
-            'POLY_API_KEY':_polyApiCreds.apiKey,'POLY_PASSPHRASE':_polyApiCreds.passphrase,
-            'Content-Type':'application/json'
-          }
-        });
-        const txt=await r.text();
-        const ok=r.ok;
-        log((ok?'✅':'❌')+' addr='+aName+' sig='+sName+': HTTP '+r.status+(ok?' → '+txt.slice(0,60):''),ok?'s':'w');
-        if(ok){
-          log('🎯 ENCONTRADO! Usando addr='+aName+' sig='+sName,'s');
-          // Salvar configuração vencedora
-          _polyApiCreds._l2AddrMode=aName;
-          _polyApiCreds._l2SigMode=sName;
-          return {addr,sig,ts};
+  for(const v of variants){
+    const sigBytes=new Uint8Array(await crypto.subtle.sign('HMAC',cryptoKey,new TextEncoder().encode(v.msg)));
+    let sig=btoa(String.fromCharCode(...sigBytes));
+    if(v.b64url)sig=sig.replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+    try{
+      const r=await fetch(POLY_HOST+path,{
+        signal:AbortSignal.timeout(4000),
+        headers:{
+          'POLY_ADDRESS':v.addr,'POLY_SIGNATURE':sig,'POLY_TIMESTAMP':ts,
+          'POLY_API_KEY':_polyApiCreds.apiKey,'POLY_PASSPHRASE':_polyApiCreds.passphrase,
+          'Content-Type':'application/json'
         }
-      }catch(e){log('❌ addr='+aName+' sig='+sName+': '+e.message,'w');}
-    }
+      });
+      const txt=await r.text();
+      log((r.ok?'✅':'❌')+' '+v.name+': HTTP '+r.status+(r.ok?' → '+txt.slice(0,80):''),r.ok?'s':'w');
+      if(r.ok){
+        log('🎯 FUNCIONOU: '+v.name,'s');
+        _polyApiCreds._winVariant=v;
+        return;
+      }
+    }catch(e){log('❌ '+v.name+': '+e.message,'w');}
   }
-  log('⚠ Nenhuma combinação funcionou. Problema pode ser outro.','e');
+  log('⚠ Todas falharam — verificar se chave está ativa na Polymarket','e');
 }
+
+
 
 
 
@@ -1972,7 +1957,7 @@ async function polyGetBalance(){
       try{
         // Testar ambos os formatos do asset_type
         const path='/balance-allowance?asset_type=0';
-        const headers=await polyL2Headers('GET',path,'');
+        const headers=await polyL2Headers('GET',path);
         if(headers){
           headers['Content-Type']='application/json';
           const r=await fetch(POLY_HOST+path,{method:'GET',headers});
