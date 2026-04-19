@@ -536,7 +536,7 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
 
 <div id="loginScreen">
   <div class="login-box">
-    <div class="login-brand">MASTER<em>BOT</em><sup>v7.7</sup></div>
+    <div class="login-brand">MASTER<em>BOT</em><sup>v7.8</sup></div>
     <div class="login-sub">Acesso Restrito · Trading Platform</div>
     <div class="login-field">
       <label>Login</label>
@@ -554,7 +554,7 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
 <div id="appContent">
 <!-- ═══ TOPBAR ═══ -->
 <div class="topbar">
-  <div class="brand">MASTER<em>BOT</em><sup>v7.7</sup></div>
+  <div class="brand">MASTER<em>BOT</em><sup>v7.8</sup></div>
   <div class="chips" id="chips">
     <div class="chip active" data-sym="BTCUSDT" data-lbl="BTC">BTC</div>
     <div class="chip" data-sym="ETHUSDT" data-lbl="ETH">ETH</div>
@@ -846,7 +846,30 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
             </div>
             <div class="fld-hint" style="margin-bottom:8px;color:var(--txt3)">⚠ Nunca compartilhe — guardado só neste dispositivo</div>
             <!-- Campos legados mantidos ocultos para compatibilidade -->
-            <input type="hidden" id="apiKey"><input type="hidden" id="apiSecret"><input type="hidden" id="apiPass">
+            <!-- Modo alternativo: inserir credenciais diretamente -->
+            <div id="directCredsSection" style="margin-top:8px;padding:8px;background:rgba(255,165,0,.08);border:1px solid rgba(255,165,0,.3);border-radius:6px;">
+              <div style="font-family:'JetBrains Mono',monospace;font-size:7px;color:var(--gold);margin-bottom:6px;cursor:pointer" onclick="g('directCredsBody').style.display=g('directCredsBody').style.display==='none'?'block':'none'">
+                ▶ MODO DIRETO — inserir API Key/Secret/Passphrase manualmente (opcional)
+              </div>
+              <div id="directCredsBody" style="display:none">
+                <div style="font-family:'JetBrains Mono',monospace;font-size:7px;color:var(--txt3);margin-bottom:4px">
+                  Use isto se a autenticação automática falhar. Obtenha as credenciais com:<br>
+                  <code style="color:var(--gold)">pip install py-clob-client</code> e o script Python
+                </div>
+                <label style="font-family:'JetBrains Mono',monospace;font-size:7px;color:var(--txt2)">API KEY</label>
+                <input type="text" id="apiKey" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" autocomplete="off"
+                  style="font-family:'JetBrains Mono',monospace;font-size:8px;padding:4px 6px;background:var(--bg2);border:1px solid var(--b2);border-radius:4px;color:var(--txt);width:100%;margin-bottom:4px"
+                  oninput="onDirectCredsInput()">
+                <label style="font-family:'JetBrains Mono',monospace;font-size:7px;color:var(--txt2)">SECRET</label>
+                <input type="password" id="apiSecret" placeholder="base64 secret..." autocomplete="off"
+                  style="font-family:'JetBrains Mono',monospace;font-size:8px;padding:4px 6px;background:var(--bg2);border:1px solid var(--b2);border-radius:4px;color:var(--txt);width:100%;margin-bottom:4px"
+                  oninput="onDirectCredsInput()">
+                <label style="font-family:'JetBrains Mono',monospace;font-size:7px;color:var(--txt2)">PASSPHRASE</label>
+                <input type="password" id="apiPass" placeholder="passphrase..." autocomplete="off"
+                  style="font-family:'JetBrains Mono',monospace;font-size:8px;padding:4px 6px;background:var(--bg2);border:1px solid var(--b2);border-radius:4px;color:var(--txt);width:100%"
+                  oninput="onDirectCredsInput()">
+              </div>
+            </div>
             <div class="api-status"><div class="api-dot" id="apiDot"></div><div style="font-size:8px;color:var(--txt3)" id="apiStatus">Não configurado — modo simulação</div></div>
           </div>
 
@@ -1658,7 +1681,8 @@ async function polyL2Headers(method,requestPath,body){
     // Output: base64 PADRÃO (igual ao arrayBufferToBase64 oficial)
     const sig=btoa(String.fromCharCode(...new Uint8Array(sigBytes)));
     
-    const addr=_polyApiCreds.walletAddress; // POLY_ADDRESS = signer address
+    // POLY_ADDRESS: funder se disponível, senão walletAddress
+    const addr=_polyApiCreds.funder||_polyApiCreds.walletAddress;
     log('🔐 L2: msg='+message.slice(0,50)+'... sig='+sig.slice(0,16),'i');
     
     return{
@@ -2110,6 +2134,31 @@ function validatePrivKey(el){
   const hint=g('privKeyHint');hint.style.display='block';
   if(/^[0-9a-fA-F]{64}$/.test(v)){hint.textContent='✓ Formato válido ('+v.length+' chars)';hint.style.color='var(--up)';}
   else{hint.textContent='✗ '+v.length+' chars (esperado 64)';hint.style.color='var(--dn)';}
+}
+
+
+// Modo de credenciais diretas — bypassa o derive automático
+function onDirectCredsInput(){
+  const key=gv('apiKey');
+  const secret=gv('apiSecret');
+  const pass=gv('apiPass');
+  if(key&&secret&&pass&&key.includes('-')&&secret.length>10&&pass.length>5){
+    // Credenciais completas — usar diretamente sem derive
+    const funder=(gv('apiFunder')||'').trim();
+    if(!funder){log('⚠ Preencha também o Funder Address','w');return;}
+    _polyApiCreds={
+      apiKey:key.trim(),
+      secret:secret.trim(),
+      passphrase:pass.trim(),
+      walletAddress:funder, // sem signer — modo direto
+      funder:funder,
+      wallet:null
+    };
+    _polyAuthFailed=false;
+    log('✅ Credenciais diretas configuradas · Key:'+key.slice(0,8)+'...','s');
+    updAPI();
+    setTimeout(()=>{testL2Auth();},500);
+  }
 }
 
 // ── Kline Open (referência do período) ──
