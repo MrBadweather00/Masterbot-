@@ -536,7 +536,7 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
 
 <div id="loginScreen">
   <div class="login-box">
-    <div class="login-brand">MASTER<em>BOT</em><sup>v9.1</sup></div>
+    <div class="login-brand">MASTER<em>BOT</em><sup>v9.3</sup></div>
     <div class="login-sub">Acesso Restrito · Trading Platform</div>
     <div class="login-field">
       <label>Login</label>
@@ -554,7 +554,7 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
 <div id="appContent">
 <!-- ═══ TOPBAR ═══ -->
 <div class="topbar">
-  <div class="brand">MASTER<em>BOT</em><sup>v9.1</sup></div>
+  <div class="brand">MASTER<em>BOT</em><sup>v9.3</sup></div>
   <div class="chips" id="chips">
     <div class="chip active" data-sym="BTCUSDT" data-lbl="BTC">BTC</div>
     <div class="chip" data-sym="ETHUSDT" data-lbl="ETH">ETH</div>
@@ -1572,15 +1572,18 @@ async function fetchPolyPrices(){
     const nowSec=Math.floor(Date.now()/1000);
     const windowTs=nowSec-(nowSec%300);
     
+    log('🔍 Buscando mercado BTC 5m... ts='+windowTs,'i');
     // Tentar slugs do período atual e anterior
     for(const wts of [windowTs, windowTs-300, windowTs+300]){
       const slug=`btc-updown-5m-${wts}`;
       try{
+        log('🔍 Tentando slug: '+slug,'i');
         const r=await fetch(`https://gamma-api.polymarket.com/markets?slug=${slug}`,{
           method:'GET',
           headers:{'Accept':'application/json'},
           mode:'cors'
         });
+        log('🔍 Resposta slug '+wts+': HTTP '+r.status,'i');
         if(!r.ok)continue;
         const d=await r.json();
         const arr=Array.isArray(d)?d:[d];
@@ -1592,7 +1595,7 @@ async function fetchPolyPrices(){
         P.marketSlug=slug;
         P.marketEnd=new Date(market.endDate||0).getTime();
         P.error=null;
-        log('✓ Mercado: '+slug+' | UP='+P.upTokenId.slice(0,14),'i');
+        log('✓ Mercado: '+slug+' | UP='+P.upTokenId.slice(0,14)+' | DN='+P.dnTokenId.slice(0,14),'i');
         
         // Buscar preços
         await Promise.all([
@@ -1658,38 +1661,72 @@ async function fetchPolyPrices(){
 
 
 // ── L2 HMAC-SHA256 Headers ──
-// Assinatura feita pelo servidor Replit (HMAC garantido correcto)
+// Tenta Replit server primeiro, fallback para HMAC local
 const SIGN_SERVER = 'https://402c96da-3756-42f1-9277-b9defe4eec42-00-4w9h746o4e99.picard.replit.dev/sign';
 
 async function polyL2Headers(method, requestPath, body){
   if(!_polyApiCreds) return null;
+  
+  // Tentar Replit server primeiro
   try{
     const payload = {
       method: method.toUpperCase(),
-      path: requestPath.split('?')[0], // path sem query string
+      path: requestPath.split('?')[0],
       body: (body !== undefined) ? body : null
     };
-    
     const res = await fetch(SIGN_SERVER, {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
       body: JSON.stringify(payload),
-      signal: AbortSignal.timeout(5000)
+      signal: AbortSignal.timeout(3000)
     });
+    if(res.ok){
+      const h = await res.json();
+      h['Content-Type'] = 'application/json';
+      log('🔐 Replit sign OK · sig='+h['POLY_SIGNATURE'].slice(0,12)+'...','i');
+      return h;
+    }
+  }catch(e){
+    log('⚠ Replit offline, usando HMAC local...','w');
+  }
+  
+  // Fallback: HMAC local
+  try{
+    const ts = String(Math.floor(Date.now()/1000));
+    const pathBase = requestPath.split('?')[0];
+    let message = ts + method.toUpperCase() + pathBase;
+    if(body !== undefined) message += body;
     
-    if(!res.ok) throw new Error('Sign server HTTP ' + res.status);
-    const h = await res.json();
+    const secret = _polyApiCreds.secret || '';
+    let b64 = secret.replace(/-/g,'+').replace(/_/g,'/');
+    const r = b64.length%4;
+    if(r===2) b64+='=='; else if(r===3) b64+='=';
+    const bin = atob(b64);
+    const keyBytes = new Uint8Array(bin.length);
+    for(let i=0;i<bin.length;i++) keyBytes[i]=bin.charCodeAt(i);
     
-    // Usar headers exactamente como o Replit devolve (não sobrepor)
-    h['Content-Type'] = 'application/json';
+    const key = await crypto.subtle.importKey('raw',keyBytes,
+      {name:'HMAC',hash:'SHA-256'},false,['sign']);
+    const sigBuf = await crypto.subtle.sign('HMAC',key,new TextEncoder().encode(message));
+    const sig = btoa(String.fromCharCode(...new Uint8Array(sigBuf)))
+      .replace(/\+/g,'-').replace(/\//g,'_');
     
-    log('🔐 Replit sign OK · ts=' + h['POLY_TIMESTAMP'] + ' sig=' + h['POLY_SIGNATURE'].slice(0,16) + '...', 'i');
-    return h;
-  } catch(e) {
-    log('❌ Sign server erro: ' + e.message, 'w');
+    log('🔐 HMAC local · ts='+ts+' sig='+sig.slice(0,12)+'...','i');
+    return {
+      'POLY_ADDRESS': _polyApiCreds.walletAddress,
+      'POLY_SIGNATURE': sig,
+      'POLY_TIMESTAMP': ts,
+      'POLY_API_KEY': _polyApiCreds.apiKey,
+      'POLY_PASSPHRASE': _polyApiCreds.passphrase,
+      'Content-Type': 'application/json'
+    };
+  }catch(e){
+    log('❌ HMAC local erro: '+e.message,'w');
     return null;
   }
 }
+
+
 
 
 
