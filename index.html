@@ -536,7 +536,7 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
 
 <div id="loginScreen">
   <div class="login-box">
-    <div class="login-brand">MASTER<em>BOT</em><sup>v9.9</sup></div>
+    <div class="login-brand">MASTER<em>BOT</em><sup>v10.3</sup></div>
     <div class="login-sub">Acesso Restrito · Trading Platform</div>
     <div class="login-field">
       <label>Login</label>
@@ -554,7 +554,7 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
 <div id="appContent">
 <!-- ═══ TOPBAR ═══ -->
 <div class="topbar">
-  <div class="brand">MASTER<em>BOT</em><sup>v9.9</sup></div>
+  <div class="brand">MASTER<em>BOT</em><sup>v10.3</sup></div>
   <div class="chips" id="chips">
     <div class="chip active" data-sym="BTCUSDT" data-lbl="BTC">BTC</div>
     <div class="chip" data-sym="ETHUSDT" data-lbl="ETH">ETH</div>
@@ -841,7 +841,7 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
             <button onclick="switchTab('c')" style="padding:4px 14px;background:rgba(255,165,0,.15);border:1px solid var(--gold);border-radius:5px;color:var(--gold);font-family:'JetBrains Mono',monospace;font-size:8px;cursor:pointer">
               ⚡ ABRIR ABA CONEXÕES
             </button>
-            <div class="api-status" style="margin-top:8px"><div class="api-dot" id="apiDot2"></div><div style="font-size:8px;color:var(--txt3)" id="apiStatus2">—</div></div>
+            <div class="api-status" style="margin-top:8px"><div class="api-dot" id="apiDot3"></div><div style="font-size:8px;color:var(--txt3)" id="apiStatus3">—</div></div>
           </div>
           <div class="sec">📊 Mercado UP</div>
           <div class="card">
@@ -1530,64 +1530,109 @@ async function fetchPolyPrices(){
   try{
     const nowSec=Math.floor(Date.now()/1000);
     const windowTs=nowSec-(nowSec%300);
-    
-    for(const wts of [windowTs, windowTs-300, windowTs+300]){
-      const slug=`btc-updown-5m-${wts}`;
-      let market=null;
-      
-      // Tentar todos os domínios disponíveis
-      const urls=[
-        `https://data-api.polymarket.com/markets?slug=${slug}`,
-        `https://gamma-api.polymarket.com/events?slug=${slug}`,
-        `https://gamma-api.polymarket.com/markets?slug=${slug}`,
-        `https://strapi-matic.poly.market/markets?slug=${slug}`,
-      ];
-      
-      for(const url of urls){
-        try{
-          const r=await fetch(url,{signal:AbortSignal.timeout(5000)});
-          if(!r.ok)continue;
-          const d=await r.json();
-          const arr=Array.isArray(d)?d:(d.markets||d.data||[d]);
-          for(const item of arr){
-            if(item.clobTokenIds&&item.clobTokenIds.length>=2){market=item;break;}
-            if(item.markets){for(const m of item.markets){if(m.clobTokenIds&&m.clobTokenIds.length>=2){market=m;break;}}}
-            if(market)break;
-          }
-          if(market){log('✓ Fonte: '+url.split('/')[2],'i');break;}
-        }catch(e){continue;}
-      }
-      
-      if(!market)continue;
-      
-      P.upTokenId=market.clobTokenIds[0];
-      P.dnTokenId=market.clobTokenIds[1];
-      P.marketSlug=slug;
-      P.error=null;
-      log('✓ '+slug.slice(-10)+' UP='+P.upTokenId.slice(0,10)+' DN='+P.dnTokenId.slice(0,10),'s');
-      
-      await Promise.all([
-        fetch(`https://clob.polymarket.com/midpoint?token_id=${P.upTokenId}`,{signal:AbortSignal.timeout(3000)})
-          .then(r=>r.json()).then(d=>{P.upPrice=parseFloat(d.mid)||null;}).catch(()=>{}),
-        fetch(`https://clob.polymarket.com/midpoint?token_id=${P.dnTokenId}`,{signal:AbortSignal.timeout(3000)})
-          .then(r=>r.json()).then(d=>{P.dnPrice=parseFloat(d.mid)||null;}).catch(()=>{})
-      ]);
-      log('💹 UP='+Math.round((P.upPrice||0)*100)+'¢ DN='+Math.round((P.dnPrice||0)*100)+'¢','i');
-      P.fetching=false;
-      return;
-    }
-    
-    // FALLBACK: inserir tokenIDs manualmente se todos os endpoints falharem
-    log('⚠ Todos os endpoints bloqueados. Use o campo Manual TokenID abaixo.','w');
+
+    // 1. TokenIDs manuais têm prioridade absoluta
     const manUp=(gv('manualUpToken')||'').trim();
     const manDn=(gv('manualDnToken')||'').trim();
-    if(manUp&&manDn){
+    if(manUp&&manDn&&manUp.length>10){
       P.upTokenId=manUp;P.dnTokenId=manDn;
-      log('✓ TokenIDs manuais aplicados','s');
+      await _fetchPrices();
+      P.fetching=false;return;
+    }
+
+    let found=false;
+    // Tentar janelas: actual, anterior, próxima
+    for(const wts of [windowTs, windowTs-300, windowTs+300]){
+      if(found)break;
+      const slug=`btc-updown-5m-${wts}`;
+
+      // 2. Replit proxy (sempre funciona, sem bloqueio Safari)
+      try{
+        const r=await fetch(`https://402c96da-3756-42f1-9277-b9defe4eec42-00-4w9h746o4e99.picard.replit.dev/market?slug=${slug}`,{signal:AbortSignal.timeout(4000)});
+        if(r.ok){
+          const d=await r.json();
+          if(d.upTokenId&&d.dnTokenId){
+            P.upTokenId=d.upTokenId;P.dnTokenId=d.dnTokenId;
+            P.marketSlug=slug;
+            log('✓ Replit: '+slug.slice(-6)+' UP='+String(P.upTokenId).slice(0,12),'s');
+            found=true;break;
+          }
+        }
+      }catch(e){}
+
+      // 3. Fallback: gamma-api directa
+      if(!found){
+        const urls=[
+          `https://gamma-api.polymarket.com/events/slug/${slug}`,
+          `https://gamma-api.polymarket.com/markets?slug=${slug}`,
+        ];
+        for(const url of urls){
+          try{
+            const r=await fetch(url,{signal:AbortSignal.timeout(4000)});
+            if(!r.ok)continue;
+            const d=await r.json();
+            const arr=Array.isArray(d)?d:(d.markets||[d]);
+            for(const item of arr){
+              if(item.clobTokenIds&&item.clobTokenIds.length>=2){
+                P.upTokenId=item.clobTokenIds[0];P.dnTokenId=item.clobTokenIds[1];
+                P.marketSlug=slug;
+                log('✓ gamma: UP='+String(P.upTokenId).slice(0,12),'s');
+                found=true;break;
+              }
+              if(item.markets){
+                for(const m of item.markets){
+                  if(m.clobTokenIds&&m.clobTokenIds.length>=2){
+                    P.upTokenId=m.clobTokenIds[0];P.dnTokenId=m.clobTokenIds[1];
+                    P.marketSlug=slug;found=true;break;
+                  }
+                }
+              }
+              if(found)break;
+            }
+            if(found)break;
+          }catch(e){continue;}
+        }
+      }
+    }
+
+    if(found){
+      await _fetchPrices();
+    }else{
+      log('⚠ Mercado não encontrado — Replit offline e Safari bloqueia gamma-api','w');
     }
   }catch(e){log('❌ fetchPolyPrices: '+e.message,'e');}
   P.fetching=false;
 }
+
+async function _fetchPrices(){
+  if(!P.upTokenId)return;
+  await Promise.all([
+    fetch(`https://clob.polymarket.com/midpoint?token_id=${P.upTokenId}`,{signal:AbortSignal.timeout(3000)})
+      .then(r=>r.json()).then(d=>{P.upPrice=parseFloat(d.mid)||null;}).catch(()=>{},),
+    fetch(`https://clob.polymarket.com/midpoint?token_id=${P.dnTokenId}`,{signal:AbortSignal.timeout(3000)})
+      .then(r=>r.json()).then(d=>{P.dnPrice=parseFloat(d.mid)||null;}).catch(()=>{})
+  ]);
+  if(P.upPrice||P.dnPrice)
+    log('💹 UP='+Math.round((P.upPrice||0)*100)+'¢ DN='+Math.round((P.dnPrice||0)*100)+'¢','i');
+}
+
+
+
+async function _fetchPrices(){
+  if(!P.upTokenId)return;
+  await Promise.all([
+    fetch(`https://clob.polymarket.com/midpoint?token_id=${P.upTokenId}`,{signal:AbortSignal.timeout(3000)})
+      .then(r=>r.json()).then(d=>{P.upPrice=parseFloat(d.mid)||null;}).catch(()=>{}),
+    fetch(`https://clob.polymarket.com/midpoint?token_id=${P.dnTokenId}`,{signal:AbortSignal.timeout(3000)})
+      .then(r=>r.json()).then(d=>{P.dnPrice=parseFloat(d.mid)||null;}).catch(()=>{})
+  ]);
+  if(P.upPrice||P.dnPrice)
+    log('💹 UP='+Math.round((P.upPrice||0)*100)+'¢ DN='+Math.round((P.dnPrice||0)*100)+'¢','i');
+}
+
+
+
+
 
 
 
@@ -3619,58 +3664,58 @@ if(apiConfigured())setTimeout(checkPolyBalance,1000);},300);
         <svg width="76" height="76" viewBox="0 0 76 76" style="position:absolute;top:0;left:0;transform:rotate(-90deg)">
           <circle cx="38" cy="38" r="30" fill="none" stroke="var(--b1)" stroke-width="5"/>
           <circle cx="38" cy="38" r="30" fill="none" stroke="var(--gold)" stroke-width="5"
-            stroke-dasharray="188" stroke-dashoffset="0" id="clockRing"
+            stroke-dasharray="188" stroke-dashoffset="0" id="clockRing-c"
             stroke-linecap="round" style="transition:stroke-dashoffset 1s linear,stroke .4s"/>
         </svg>
         <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;">
-          <div style="font-family:'Bebas Neue',sans-serif;font-size:20px;line-height:1;color:var(--white)" id="clockCd">—:——</div>
-          <div style="font-family:'JetBrains Mono',monospace;font-size:7px;color:var(--txt3);" id="clockPct">—%</div>
+          <div style="font-family:'Bebas Neue',sans-serif;font-size:20px;line-height:1;color:var(--white)" id="clockCd-c">—:——</div>
+          <div style="font-family:'JetBrains Mono',monospace;font-size:7px;color:var(--txt3);" id="clockPct-c">—%</div>
         </div>
       </div>
       <!-- info -->
       <div style="flex:1;">
         <div style="font-family:'JetBrains Mono',monospace;font-size:8px;color:var(--txt3);letter-spacing:1px;margin-bottom:4px;">PERÍODO ATUAL</div>
-        <div style="font-family:'Bebas Neue',sans-serif;font-size:13px;letter-spacing:2px;margin-bottom:3px;" id="clockPeriodLbl" style="color:var(--white)">——</div>
-        <div style="font-family:'JetBrains Mono',monospace;font-size:8px;color:var(--txt2);margin-bottom:6px;" id="clockTfLbl">Timeframe: —</div>
+        <div style="font-family:'Bebas Neue',sans-serif;font-size:13px;letter-spacing:2px;margin-bottom:3px;" id="clockPeriodLbl-c" style="color:var(--white)">——</div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:8px;color:var(--txt2);margin-bottom:6px;" id="clockTfLbl-c">Timeframe: —</div>
         <!-- UP and DOWN status inline -->
         <!-- Delta line -->
-        <div style="font-family:'JetBrains Mono',monospace;font-size:8px;margin-bottom:5px;display:flex;gap:8px;flex-wrap:wrap;" id="clockDelta"><span style="color:var(--txt3)">Aguardando ref...</span></div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:8px;margin-bottom:5px;display:flex;gap:8px;flex-wrap:wrap;" id="clockDelta-c"><span style="color:var(--txt3)">Aguardando ref...</span></div>
         <div style="display:flex;gap:6px;margin-bottom:6px;">
-          <div style="font-family:'JetBrains Mono',monospace;font-size:7px;padding:2px 6px;border-radius:4px;background:var(--up3);color:var(--up);" id="clockStU">UP: parado</div>
-          <div style="font-family:'JetBrains Mono',monospace;font-size:7px;padding:2px 6px;border-radius:4px;background:var(--dn3);color:var(--dn);" id="clockStD">DN: parado</div>
+          <div style="font-family:'JetBrains Mono',monospace;font-size:7px;padding:2px 6px;border-radius:4px;background:var(--up3);color:var(--up);" id="clockStU-c">UP: parado</div>
+          <div style="font-family:'JetBrains Mono',monospace;font-size:7px;padding:2px 6px;border-radius:4px;background:var(--dn3);color:var(--dn);" id="clockStD-c">DN: parado</div>
         </div>
         <!-- Botões Buy UP / Buy DOWN estilo Polymarket -->
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;">
           <div style="background:rgba(0,229,160,.15);border:1px solid var(--up);border-radius:7px;padding:5px 8px;text-align:center;cursor:default;">
             <div style="font-family:'JetBrains Mono',monospace;font-size:7px;color:var(--up);margin-bottom:2px;">BUY UP ↑</div>
-            <div style="font-family:'Bebas Neue',sans-serif;font-size:16px;color:var(--up);line-height:1" id="polyBuyUp">—¢</div>
+            <div style="font-family:'Bebas Neue',sans-serif;font-size:16px;color:var(--up);line-height:1" id="polyBuyUp-c">—¢</div>
           </div>
           <div style="background:rgba(255,59,92,.15);border:1px solid var(--dn);border-radius:7px;padding:5px 8px;text-align:center;cursor:default;">
             <div style="font-family:'JetBrains Mono',monospace;font-size:7px;color:var(--dn);margin-bottom:2px;">BUY DOWN ↓</div>
-            <div style="font-family:'Bebas Neue',sans-serif;font-size:16px;color:var(--dn);line-height:1" id="polyBuyDn">—¢</div>
+            <div style="font-family:'Bebas Neue',sans-serif;font-size:16px;color:var(--dn);line-height:1" id="polyBuyDn-c">—¢</div>
           </div>
         </div>
       </div>
     </div>
 
     <!-- Saldo Polymarket — só aparece quando API configurada -->
-    <div id="polyBalanceCard" style="display:none;background:var(--bg2);border:1px solid var(--b2);border-radius:10px;padding:10px;margin-bottom:8px;">
+    <div id="polyBalanceCard-c" style="display:none;background:var(--bg2);border:1px solid var(--b2);border-radius:10px;padding:10px;margin-bottom:8px;">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
         <div style="font-family:'JetBrains Mono',monospace;font-size:7px;color:var(--txt3);letter-spacing:1px">💰 SALDO POLYMARKET</div>
         <div style="display:flex;align-items:center;gap:6px;">
           <button onclick="polyAutoRedeem()" title="Resgatar wins automaticamente" style="padding:2px 7px;background:rgba(0,229,160,.15);border:1px solid var(--up);border-radius:4px;color:var(--up);font-size:7px;cursor:pointer;font-family:'JetBrains Mono',monospace">💸 Resgatar</button>
           <button onclick="testL2Auth()" style="padding:2px 7px;background:rgba(100,100,255,.2);border:1px solid #6666ff;border-radius:4px;color:#aaaaff;font-size:7px;cursor:pointer;font-family:'JetBrains Mono',monospace">🧪 Testar</button>
           <button onclick="checkPolyBalance()" style="padding:2px 7px;background:var(--bg3);border:1px solid var(--b2);border-radius:4px;color:var(--txt2);font-size:8px;cursor:pointer;font-family:'JetBrains Mono',monospace">↺</button>
-          <div style="font-family:'JetBrains Mono',monospace;font-size:7px;color:var(--up)" id="polyConnStatus">● REAL</div>
+          <div style="font-family:'JetBrains Mono',monospace;font-size:7px;color:var(--up)" id="polyConnStatus-c">● REAL</div>
         </div>
       </div>
       <!-- Números de saldo -->
-      <div id="polyBalanceDisplay">
+      <div id="polyBalanceDisplay-c">
         <span style="color:var(--txt3);font-family:'JetBrains Mono',monospace;font-size:8px">Carregando...</span>
       </div>
       <!-- Saldo manual (fallback) -->
       <div style="margin-top:6px;display:flex;align-items:center;gap:6px;">
-        <input type="number" id="manualBalance" placeholder="Saldo manual $" step="0.01" min="0"
+        <input type="number" id="manualBalance-c" placeholder="Saldo manual $" step="0.01" min="0"
           style="font-family:'JetBrains Mono',monospace;font-size:9px;padding:3px 6px;background:var(--bg3);border:1px solid var(--b2);border-radius:4px;color:var(--txt);width:100px;"
           oninput="localStorage.setItem('_manualBalance',this.value);checkPolyBalance()">
         <span style="font-family:'JetBrains Mono',monospace;font-size:7px;color:var(--txt3)">← inserir saldo manualmente se necessário</span>
@@ -3678,10 +3723,10 @@ if(apiConfigured())setTimeout(checkPolyBalance,1000);},300);
       <!-- Mini gráfico evolução do saldo -->
       <div style="margin-top:8px;position:relative;">
         <div style="font-family:'JetBrains Mono',monospace;font-size:6px;color:var(--txt3);margin-bottom:3px;letter-spacing:1px">EVOLUÇÃO DO SALDO</div>
-        <canvas id="balChart" style="width:100%;height:56px;display:block;border-radius:4px;"></canvas>
+        <canvas id="balChart-c" style="width:100%;height:56px;display:block;border-radius:4px;"></canvas>
         <div style="display:flex;justify-content:space-between;margin-top:2px;">
-          <span style="font-family:'JetBrains Mono',monospace;font-size:6px;color:var(--txt3)" id="balChartMin">—</span>
-          <span style="font-family:'JetBrains Mono',monospace;font-size:6px;color:var(--txt3)" id="balChartMax">—</span>
+          <span style="font-family:'JetBrains Mono',monospace;font-size:6px;color:var(--txt3)" id="balChartMin-c">—</span>
+          <span style="font-family:'JetBrains Mono',monospace;font-size:6px;color:var(--txt3)" id="balChartMax-c">—</span>
         </div>
       </div>
     </div>
