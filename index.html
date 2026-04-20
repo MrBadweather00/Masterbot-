@@ -536,7 +536,7 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
 
 <div id="loginScreen">
   <div class="login-box">
-    <div class="login-brand">MASTER<em>BOT</em><sup>v10.3</sup></div>
+    <div class="login-brand">MASTER<em>BOT</em><sup>v10.4</sup></div>
     <div class="login-sub">Acesso Restrito · Trading Platform</div>
     <div class="login-field">
       <label>Login</label>
@@ -554,7 +554,7 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
 <div id="appContent">
 <!-- ═══ TOPBAR ═══ -->
 <div class="topbar">
-  <div class="brand">MASTER<em>BOT</em><sup>v10.3</sup></div>
+  <div class="brand">MASTER<em>BOT</em><sup>v10.4</sup></div>
   <div class="chips" id="chips">
     <div class="chip active" data-sym="BTCUSDT" data-lbl="BTC">BTC</div>
     <div class="chip" data-sym="ETHUSDT" data-lbl="ETH">ETH</div>
@@ -1844,16 +1844,12 @@ async function polyPlaceOrder(tokenId,side,price,sizeUSDC){
       log('🔑 Wallet criado para assinar ordem: '+wallet.address.slice(0,12)+'...','i');
     }
     
-    // Calcular size (shares)
-    const size=parseFloat((sizeUSDC/price).toFixed(2));
-    if(size<5){
-      log('⚠ Tamanho mínimo Polymarket: 5 shares (você tem '+size+')','w');
-      return null;
-    }
+    // FOK: makerAmount = USDC a gastar, takerAmount = shares mínimas esperadas
+    // Polymarket aceita FOK em dólares sem mínimo de shares
+    const size=parseFloat((sizeUSDC/price).toFixed(4));
+    log('📤 '+side+' '+Math.round(price*100)+'¢ · $'+sizeUSDC+' ('+size.toFixed(2)+' shares) · FOK','i');
     
-    log('📤 Preparando ordem: '+side+' '+Math.round(price*100)+'¢ · $'+sizeUSDC+' ('+size+' shares) · token:'+tokenId.slice(0,14)+'...','i');
-    
-    // EIP-712 Order signing
+    // EIP-712 Order signing — FOK usa makerAmount em USDC
     const makerAmount=Math.round(sizeUSDC*1e6); // USDC 6 decimais
     const takerAmount=Math.round(size*1e6);     // shares 6 decimais
     const salt=Math.floor(Math.random()*1e15);
