@@ -536,7 +536,7 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
 
 <div id="loginScreen">
   <div class="login-box">
-    <div class="login-brand">MASTER<em>BOT</em><sup>v11.3</sup></div>
+    <div class="login-brand">MASTER<em>BOT</em><sup>v11.4</sup></div>
     <div class="login-sub">Acesso Restrito · Trading Platform</div>
     <div class="login-field">
       <label>Login</label>
@@ -554,7 +554,7 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
 <div id="appContent">
 <!-- ═══ TOPBAR ═══ -->
 <div class="topbar">
-  <div class="brand">MASTER<em>BOT</em><sup>v11.3</sup></div>
+  <div class="brand">MASTER<em>BOT</em><sup>v11.4</sup></div>
   <div class="chips" id="chips">
     <div class="chip active" data-sym="BTCUSDT" data-lbl="BTC">BTC</div>
     <div class="chip" data-sym="ETHUSDT" data-lbl="ETH">ETH</div>
@@ -1852,11 +1852,14 @@ async function polyPlaceOrder(tokenId,side,price,sizeUSDC){
       _polyApiCreds.wallet=wallet;
       log('🔑 Wallet: '+wallet.address.slice(0,12),'i');
     }
-    // FUNDER depois (agora wallet já existe)
+    // FUNDER: usar directamente sem normalização
     const rawFunder=(_polyApiCreds.funder||'').trim();
-    let funder=rawFunder;
-    try{ funder=ethers.utils.getAddress(rawFunder); }
-    catch(e){ funder=wallet.address; log('⚠ Funder inválido, usando signer','w'); }
+    // Tentar checksum, mas se falhar usar o endereço original
+    let funder=rawFunder||wallet.address;
+    if(rawFunder&&rawFunder.startsWith('0x')&&rawFunder.length===42){
+      funder=rawFunder; // usar tal como está
+    }
+    log('maker/funder: '+funder.slice(0,14),'i');
     
     // FOK: makerAmount = USDC a gastar, takerAmount = shares mínimas esperadas
     // Polymarket aceita FOK em dólares sem mínimo de shares
@@ -1916,16 +1919,17 @@ async function polyPlaceOrder(tokenId,side,price,sizeUSDC){
       maker:funder,
       signer:wallet.address,
       taker:'0x0000000000000000000000000000000000000000',
-      tokenId:tokenId,
+      tokenId:String(tokenId),
       makerAmount:String(makerAmount),
       takerAmount:String(takerAmount),
       expiration:'0',
       nonce:'0',
       feeRateBps:'0',
-      side:side==='BUY'?'BUY':'SELL',
+      side:side==='BUY'?0:1,
       signatureType:1,
       signature:orderSig
     };
+    log('📋 payload: maker='+funder.slice(0,10)+' token='+String(tokenId).slice(0,10)+' maker$='+makerAmount+' taker='+takerAmount,'i');
     
     const bodyObj={
       order:orderPayload,
