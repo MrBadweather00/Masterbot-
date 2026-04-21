@@ -536,7 +536,7 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
 
 <div id="loginScreen">
   <div class="login-box">
-    <div class="login-brand">MASTER<em>BOT</em><sup>v10.6</sup></div>
+    <div class="login-brand">MASTER<em>BOT</em><sup>v10.7</sup></div>
     <div class="login-sub">Acesso Restrito · Trading Platform</div>
     <div class="login-field">
       <label>Login</label>
@@ -554,7 +554,7 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
 <div id="appContent">
 <!-- ═══ TOPBAR ═══ -->
 <div class="topbar">
-  <div class="brand">MASTER<em>BOT</em><sup>v10.6</sup></div>
+  <div class="brand">MASTER<em>BOT</em><sup>v10.7</sup></div>
   <div class="chips" id="chips">
     <div class="chip active" data-sym="BTCUSDT" data-lbl="BTC">BTC</div>
     <div class="chip" data-sym="ETHUSDT" data-lbl="ETH">ETH</div>
@@ -1531,7 +1531,7 @@ async function fetchPolyPrices(){
     const nowSec=Math.floor(Date.now()/1000);
     const windowTs=nowSec-(nowSec%300);
 
-    // 1. TokenIDs manuais têm prioridade absoluta
+    // 1. TokenIDs manuais têm prioridade
     const manUp=(gv('manualUpToken')||'').trim();
     const manDn=(gv('manualDnToken')||'').trim();
     if(manUp&&manDn&&manUp.length>10){
@@ -1540,69 +1540,79 @@ async function fetchPolyPrices(){
       P.fetching=false;return;
     }
 
+    // 2. Tentar Replit /market (quando online)
     let found=false;
-    // Tentar janelas: actual, anterior, próxima
     for(const wts of [windowTs, windowTs+300, windowTs-300]){
       if(found)break;
       const slug=`btc-updown-5m-${wts}`;
-
-      // 2. Replit proxy (sempre funciona, sem bloqueio Safari)
+      
+      // Replit proxy
       try{
-        const r=await fetch(`https://402c96da-3756-42f1-9277-b9defe4eec42-00-4w9h746o4e99.picard.replit.dev/market?slug=${slug}`,{signal:AbortSignal.timeout(10000)}); 
+        const r=await fetch(`${SIGN_SERVER.replace('/sign','/market')}?slug=${slug}`,
+          {signal:AbortSignal.timeout(3000)});
         if(r.ok){
           const d=await r.json();
-          if(d.upTokenId&&d.dnTokenId){
-            P.upTokenId=d.upTokenId;P.dnTokenId=d.dnTokenId;
+          if(d.upTokenId){
+            P.upTokenId=String(d.upTokenId);
+            P.dnTokenId=String(d.dnTokenId);
             P.marketSlug=slug;
-            log('✓ Replit: '+slug.slice(-6)+' UP='+String(P.upTokenId).slice(0,12),'s');
+            log('✓ Mercado: '+slug.slice(-6)+' UP='+P.upTokenId.slice(0,12),'s');
             found=true;break;
           }
         }
       }catch(e){}
-
-      // 3. Fallback: gamma-api directa
+      
+      // Gamma-api directa
       if(!found){
-        const urls=[
-          `https://gamma-api.polymarket.com/events/slug/${slug}`,
-          `https://gamma-api.polymarket.com/markets?slug=${slug}`,
-        ];
-        for(const url of urls){
-          try{
-            const r=await fetch(url,{signal:AbortSignal.timeout(10000)}); 
-            if(!r.ok)continue;
+        try{
+          const r=await fetch(
+            `https://gamma-api.polymarket.com/markets?slug=${slug}`,
+            {signal:AbortSignal.timeout(5000)}
+          );
+          if(r.ok){
             const d=await r.json();
-            const arr=Array.isArray(d)?d:(d.markets||[d]);
-            for(const item of arr){
-              if(item.clobTokenIds&&item.clobTokenIds.length>=2){
-                P.upTokenId=item.clobTokenIds[0];P.dnTokenId=item.clobTokenIds[1];
+            const arr=Array.isArray(d)?d:[d];
+            for(const m of arr){
+              // clobTokenIds pode ser string JSON ou array
+              let tids=m.clobTokenIds;
+              if(typeof tids==='string'){try{tids=JSON.parse(tids);}catch(e){}}
+              if(Array.isArray(tids)&&tids.length>=2){
+                P.upTokenId=String(tids[0]);
+                P.dnTokenId=String(tids[1]);
                 P.marketSlug=slug;
-                log('✓ gamma: UP='+String(P.upTokenId).slice(0,12),'s');
+                log('✓ gamma-api: UP='+P.upTokenId.slice(0,12),'s');
                 found=true;break;
               }
-              if(item.markets){
-                for(const m of item.markets){
-                  if(m.clobTokenIds&&m.clobTokenIds.length>=2){
-                    P.upTokenId=m.clobTokenIds[0];P.dnTokenId=m.clobTokenIds[1];
-                    P.marketSlug=slug;found=true;break;
-                  }
-                }
-              }
-              if(found)break;
             }
-            if(found)break;
-          }catch(e){continue;}
-        }
+          }
+        }catch(e){}
       }
     }
 
     if(found){
       await _fetchPrices();
     }else{
-      log('⚠ Mercado não encontrado — Replit offline e Safari bloqueia gamma-api','w');
+      log('⚠ Replit offline + Safari bloqueia. Insere TokenIDs manualmente.','w');
     }
   }catch(e){log('❌ fetchPolyPrices: '+e.message,'e');}
   P.fetching=false;
 }
+
+async function _fetchPrices(){
+  if(!P.upTokenId)return;
+  await Promise.all([
+    fetch(`https://clob.polymarket.com/midpoint?token_id=${P.upTokenId}`,
+      {signal:AbortSignal.timeout(3000)})
+      .then(r=>r.json()).then(d=>{P.upPrice=parseFloat(d.mid)||null;}).catch(()=>{}),
+    fetch(`https://clob.polymarket.com/midpoint?token_id=${P.dnTokenId}`,
+      {signal:AbortSignal.timeout(3000)})
+      .then(r=>r.json()).then(d=>{P.dnPrice=parseFloat(d.mid)||null;}).catch(()=>{})
+  ]);
+  if(P.upPrice||P.dnPrice)
+    log('💹 UP='+Math.round((P.upPrice||0)*100)+'¢ DN='+Math.round((P.dnPrice||0)*100)+'¢','i');
+}
+
+
 
 async function _fetchPrices(){
   if(!P.upTokenId)return;
