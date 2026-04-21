@@ -536,7 +536,7 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
 
 <div id="loginScreen">
   <div class="login-box">
-    <div class="login-brand">MASTER<em>BOT</em><sup>v11.5</sup></div>
+    <div class="login-brand">MASTER<em>BOT</em><sup>v11.6</sup></div>
     <div class="login-sub">Acesso Restrito · Trading Platform</div>
     <div class="login-field">
       <label>Login</label>
@@ -554,7 +554,7 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
 <div id="appContent">
 <!-- ═══ TOPBAR ═══ -->
 <div class="topbar">
-  <div class="brand">MASTER<em>BOT</em><sup>v11.5</sup></div>
+  <div class="brand">MASTER<em>BOT</em><sup>v11.6</sup></div>
   <div class="chips" id="chips">
     <div class="chip active" data-sym="BTCUSDT" data-lbl="BTC">BTC</div>
     <div class="chip" data-sym="ETHUSDT" data-lbl="ETH">ETH</div>
@@ -1852,21 +1852,17 @@ async function polyPlaceOrder(tokenId,side,price,sizeUSDC){
       _polyApiCreds.wallet=wallet;
       log('🔑 Wallet: '+wallet.address.slice(0,12),'i');
     }
-    // FUNDER: calcular checksum correcto
-    const rawFunder=(_polyApiCreds.funder||'').trim();
-    let funder=wallet.address; // default
+    // FUNDER com checksum EIP-55 correcto
+    const rawFunder=(_polyApiCreds.funder||gv('apiFunder')||'').trim();
+    let funder='0xF41Dc8b905096ec5ED98FA97a9bbad8fFAAAF91';
     if(rawFunder&&rawFunder.startsWith('0x')&&rawFunder.length===42){
-      // Calcular checksum EIP-55 usando keccak256 do ethers
-      try{
-        // ethers.utils.getAddress aceita endereços em qualquer case se forem válidos
-        funder=ethers.utils.getAddress(rawFunder.toLowerCase().replace(/[^0-9a-fx]/g,''));
-      }catch(e){
-        // Usar endereço conhecido correcto
-        funder='0xF41Dc8b905096ec5ED98FA97a9bbad8fFAAAF91';
-        log('⚠ Usando funder hardcoded','w');
+      try{funder=ethers.utils.getAddress(rawFunder);}catch(e){
+        try{funder=ethers.utils.getAddress(rawFunder.toLowerCase());}catch(e2){
+          funder='0xF41Dc8b905096ec5ED98FA97a9bbad8fFAAAF91'; log('⚠ funder fallback','w');
+        }
       }
     }
-    log('maker/funder: '+funder.slice(0,14),'i');
+    log('maker='+funder.slice(0,14),'i');
     
     // FOK: makerAmount = USDC a gastar, takerAmount = shares mínimas esperadas
     // Polymarket aceita FOK em dólares sem mínimo de shares
