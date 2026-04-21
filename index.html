@@ -536,7 +536,7 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
 
 <div id="loginScreen">
   <div class="login-box">
-    <div class="login-brand">MASTER<em>BOT</em><sup>v10.7</sup></div>
+    <div class="login-brand">MASTER<em>BOT</em><sup>v10.8</sup></div>
     <div class="login-sub">Acesso Restrito · Trading Platform</div>
     <div class="login-field">
       <label>Login</label>
@@ -554,7 +554,7 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
 <div id="appContent">
 <!-- ═══ TOPBAR ═══ -->
 <div class="topbar">
-  <div class="brand">MASTER<em>BOT</em><sup>v10.7</sup></div>
+  <div class="brand">MASTER<em>BOT</em><sup>v10.8</sup></div>
   <div class="chips" id="chips">
     <div class="chip active" data-sym="BTCUSDT" data-lbl="BTC">BTC</div>
     <div class="chip" data-sym="ETHUSDT" data-lbl="ETH">ETH</div>
@@ -1840,7 +1840,9 @@ async function polyPlaceOrder(tokenId,side,price,sizeUSDC){
     if(!ok){log('❌ Falha autenticação, abortando ordem','e');return null;}
   }
   try{
-    const funder=_polyApiCreds.funder;
+    // Normalizar endereços para checksum EIP-55 (evita erro ENS)
+    const rawFunder=_polyApiCreds.funder||'';
+    const funder=ethers.utils.getAddress(rawFunder.toLowerCase());
     // Em modo direto wallet pode ser null — recriar a partir da private key
     let wallet=_polyApiCreds.wallet;
     if(!wallet){
