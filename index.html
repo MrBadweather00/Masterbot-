@@ -536,7 +536,7 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
 
 <div id="loginScreen">
   <div class="login-box">
-    <div class="login-brand">MASTER<em>BOT</em><sup>v11.4</sup></div>
+    <div class="login-brand">MASTER<em>BOT</em><sup>v11.5</sup></div>
     <div class="login-sub">Acesso Restrito · Trading Platform</div>
     <div class="login-field">
       <label>Login</label>
@@ -554,7 +554,7 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
 <div id="appContent">
 <!-- ═══ TOPBAR ═══ -->
 <div class="topbar">
-  <div class="brand">MASTER<em>BOT</em><sup>v11.4</sup></div>
+  <div class="brand">MASTER<em>BOT</em><sup>v11.5</sup></div>
   <div class="chips" id="chips">
     <div class="chip active" data-sym="BTCUSDT" data-lbl="BTC">BTC</div>
     <div class="chip" data-sym="ETHUSDT" data-lbl="ETH">ETH</div>
@@ -1852,12 +1852,19 @@ async function polyPlaceOrder(tokenId,side,price,sizeUSDC){
       _polyApiCreds.wallet=wallet;
       log('🔑 Wallet: '+wallet.address.slice(0,12),'i');
     }
-    // FUNDER: usar directamente sem normalização
+    // FUNDER: calcular checksum correcto
     const rawFunder=(_polyApiCreds.funder||'').trim();
-    // Tentar checksum, mas se falhar usar o endereço original
-    let funder=rawFunder||wallet.address;
+    let funder=wallet.address; // default
     if(rawFunder&&rawFunder.startsWith('0x')&&rawFunder.length===42){
-      funder=rawFunder; // usar tal como está
+      // Calcular checksum EIP-55 usando keccak256 do ethers
+      try{
+        // ethers.utils.getAddress aceita endereços em qualquer case se forem válidos
+        funder=ethers.utils.getAddress(rawFunder.toLowerCase().replace(/[^0-9a-fx]/g,''));
+      }catch(e){
+        // Usar endereço conhecido correcto
+        funder='0xF41Dc8b905096ec5ED98FA97a9bbad8fFAAAF91';
+        log('⚠ Usando funder hardcoded','w');
+      }
     }
     log('maker/funder: '+funder.slice(0,14),'i');
     
