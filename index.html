@@ -536,7 +536,7 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
 
 <div id="loginScreen">
   <div class="login-box">
-    <div class="login-brand">MASTER<em>BOT</em><sup>v10.4</sup></div>
+    <div class="login-brand">MASTER<em>BOT</em><sup>v10.6</sup></div>
     <div class="login-sub">Acesso Restrito · Trading Platform</div>
     <div class="login-field">
       <label>Login</label>
@@ -554,7 +554,7 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
 <div id="appContent">
 <!-- ═══ TOPBAR ═══ -->
 <div class="topbar">
-  <div class="brand">MASTER<em>BOT</em><sup>v10.4</sup></div>
+  <div class="brand">MASTER<em>BOT</em><sup>v10.6</sup></div>
   <div class="chips" id="chips">
     <div class="chip active" data-sym="BTCUSDT" data-lbl="BTC">BTC</div>
     <div class="chip" data-sym="ETHUSDT" data-lbl="ETH">ETH</div>
@@ -1542,13 +1542,13 @@ async function fetchPolyPrices(){
 
     let found=false;
     // Tentar janelas: actual, anterior, próxima
-    for(const wts of [windowTs, windowTs-300, windowTs+300]){
+    for(const wts of [windowTs, windowTs+300, windowTs-300]){
       if(found)break;
       const slug=`btc-updown-5m-${wts}`;
 
       // 2. Replit proxy (sempre funciona, sem bloqueio Safari)
       try{
-        const r=await fetch(`https://402c96da-3756-42f1-9277-b9defe4eec42-00-4w9h746o4e99.picard.replit.dev/market?slug=${slug}`,{signal:AbortSignal.timeout(4000)});
+        const r=await fetch(`https://402c96da-3756-42f1-9277-b9defe4eec42-00-4w9h746o4e99.picard.replit.dev/market?slug=${slug}`,{signal:AbortSignal.timeout(10000)}); 
         if(r.ok){
           const d=await r.json();
           if(d.upTokenId&&d.dnTokenId){
@@ -1568,7 +1568,7 @@ async function fetchPolyPrices(){
         ];
         for(const url of urls){
           try{
-            const r=await fetch(url,{signal:AbortSignal.timeout(4000)});
+            const r=await fetch(url,{signal:AbortSignal.timeout(10000)}); 
             if(!r.ok)continue;
             const d=await r.json();
             const arr=Array.isArray(d)?d:(d.markets||[d]);
@@ -1608,7 +1608,7 @@ async function _fetchPrices(){
   if(!P.upTokenId)return;
   await Promise.all([
     fetch(`https://clob.polymarket.com/midpoint?token_id=${P.upTokenId}`,{signal:AbortSignal.timeout(3000)})
-      .then(r=>r.json()).then(d=>{P.upPrice=parseFloat(d.mid)||null;}).catch(()=>{},),
+      .then(r=>r.json()).then(d=>{P.upPrice=parseFloat(d.mid)||null;}).catch(()=>{}),
     fetch(`https://clob.polymarket.com/midpoint?token_id=${P.dnTokenId}`,{signal:AbortSignal.timeout(3000)})
       .then(r=>r.json()).then(d=>{P.dnPrice=parseFloat(d.mid)||null;}).catch(()=>{})
   ]);
@@ -1803,7 +1803,7 @@ async function checkAllConnections(){
   
   // Testar Replit
   try{
-    const r=await fetch(SIGN_SERVER.replace('/sign','/health')||SIGN_SERVER,{signal:AbortSignal.timeout(3000),method:'GET'});
+    const r=await fetch(SIGN_SERVER.replace('/sign','')+'/market',{signal:AbortSignal.timeout(8000),method:'GET'});
     set('connReplitStatus',r.ok?'● ONLINE':'● SEM CRÉDITOS',r.ok);
     log('Replit: HTTP '+r.status,r.ok);
   }catch(e){set('connReplitStatus','● OFFLINE',false);log('Replit: offline',false);}
@@ -2846,9 +2846,9 @@ async function executeTrade(B){
   log(`${tag} ${actualDir} #${B.rounds} ${et} ENTRADA ${Math.round(polyP*100)}¢[${polySource}] @${entryTime} · Δ${entryDiff>=0?'+':''}$${entryDiff} · fecha em ${ml}:${sl2}`,'w');
 
   // Guardar se foi real para usar no resultado
-  // Se não temos tokenId, tentar buscar agora
-  if(apiConfigured()&&!P.upTokenId&&!P.fetching){
-    log('🔄 Buscando tokenId antes da ordem...','i');
+  // Garantir tokenId actualizado
+  if(apiConfigured()&&(!P.upTokenId||P.marketSlug!==`btc-updown-5m-${Math.floor(Date.now()/1000/300)*300}`)&&!P.fetching){
+    log('🔄 Actualizando tokenId...','i');
     await fetchPolyPrices();
   }
   // Executar ordem REAL — só se tiver tokenId válido
