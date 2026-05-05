@@ -536,7 +536,7 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
 
 <div id="loginScreen">
   <div class="login-box">
-    <div class="login-brand">MASTER<em>BOT</em><sup>v12.2</sup></div>
+    <div class="login-brand">MASTER<em>BOT</em><sup>v12.3</sup></div>
     <div class="login-sub">Acesso Restrito · Trading Platform</div>
     <div class="login-field">
       <label>Login</label>
@@ -554,7 +554,7 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
 <div id="appContent">
 <!-- ═══ TOPBAR ═══ -->
 <div class="topbar">
-  <div class="brand">MASTER<em>BOT</em><sup>v12.2</sup></div>
+  <div class="brand">MASTER<em>BOT</em><sup>v12.3</sup></div>
   <div class="chips" id="chips">
     <div class="chip active" data-sym="BTCUSDT" data-lbl="BTC">BTC</div>
     <div class="chip" data-sym="ETHUSDT" data-lbl="ETH">ETH</div>
@@ -1671,16 +1671,18 @@ async function polyL2Headers(method, requestPath, body){
       method: 'POST',
       headers: {'Content-Type':'application/json'},
       body: JSON.stringify(payload),
-      signal: AbortSignal.timeout(3000)
+      signal: AbortSignal.timeout(8000)  // aumentado para 8s
     });
     if(res.ok){
       const h = await res.json();
       h['Content-Type'] = 'application/json';
       log('🔐 Replit sign OK · sig='+h['POLY_SIGNATURE'].slice(0,12)+'...','i');
       return h;
+    } else {
+      log('⚠ Replit HTTP '+res.status+', usando HMAC local...','w');
     }
   }catch(e){
-    log('⚠ Replit offline, usando HMAC local...','w');
+    log('⚠ Replit erro: '+e.message.slice(0,30)+', usando HMAC local...','w');
   }
   
   // Fallback: HMAC local
