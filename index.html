@@ -536,7 +536,7 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
 
 <div id="loginScreen">
   <div class="login-box">
-    <div class="login-brand">MASTER<em>BOT</em><sup>v12.3</sup></div>
+    <div class="login-brand">MASTER<em>BOT</em><sup>v12.5</sup></div>
     <div class="login-sub">Acesso Restrito · Trading Platform</div>
     <div class="login-field">
       <label>Login</label>
@@ -554,7 +554,7 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
 <div id="appContent">
 <!-- ═══ TOPBAR ═══ -->
 <div class="topbar">
-  <div class="brand">MASTER<em>BOT</em><sup>v12.3</sup></div>
+  <div class="brand">MASTER<em>BOT</em><sup>v12.5</sup></div>
   <div class="chips" id="chips">
     <div class="chip active" data-sym="BTCUSDT" data-lbl="BTC">BTC</div>
     <div class="chip" data-sym="ETHUSDT" data-lbl="ETH">ETH</div>
@@ -1796,6 +1796,36 @@ async function testL2Auth(){
 
 
 
+async function diagCompleto(){
+  log("=== DIAGNÓSTICO COMPLETO ===","i");
+  
+  // Teste 1: Replit /health
+  try{
+    const r=await fetch("https://402c96da-3756-42f1-9277-b9defe4eec42-00-4w9h746o4e99.picard.replit.dev/health",
+      {signal:AbortSignal.timeout(8000)});
+    const t=await r.text();
+    log("Replit /health: HTTP "+r.status+" → "+t,"s");
+  }catch(e){log("Replit /health ERRO: "+e.message,"e");}
+  
+  // Teste 2: Replit /sign
+  try{
+    const r=await fetch("https://402c96da-3756-42f1-9277-b9defe4eec42-00-4w9h746o4e99.picard.replit.dev/sign",
+      {method:"POST",headers:{"Content-Type":"application/json"},
+       body:JSON.stringify({method:"GET",path:"/balance-allowance",body:null}),
+       signal:AbortSignal.timeout(8000)});
+    const t=await r.text();
+    log("Replit /sign: HTTP "+r.status+" → "+t.slice(0,100),"s");
+  }catch(e){log("Replit /sign ERRO: "+e.message,"e");}
+  
+  // Teste 3: CLOB directamente
+  try{
+    const r=await fetch("https://clob.polymarket.com/ok",{signal:AbortSignal.timeout(5000)});
+    log("CLOB /ok: HTTP "+r.status,"s");
+  }catch(e){log("CLOB ERRO: "+e.message,"e");}
+  
+  log("=== FIM DIAGNÓSTICO ===","i");
+}
+
 async function checkAllConnections(){
   const log=(msg,ok)=>{
     const el=document.getElementById('connLog');
@@ -1834,124 +1864,37 @@ async function checkAllConnections(){
   await checkPolyBalance();
 }
 
-// ── Executar ordem REAL na Polymarket ──
+// ── Executar ordem REAL na Polymarket via Replit ──
 async function polyPlaceOrder(tokenId,side,price,sizeUSDC){
   if(!_polyApiCreds){
-    log('⚠ Sem credenciais — autenticando...','w');
-    const ok=await polyDeriveCredentials();
-    if(!ok){log('❌ Falha autenticação, abortando ordem','e');return null;}
+    log('⚠ Sem credenciais','w');
+    return null;
   }
   try{
-    // WALLET PRIMEIRO (antes de usar wallet.address)
-    let wallet=_polyApiCreds.wallet;
-    if(!wallet){
-      const pk=(gv('apiPrivKey')||'').trim().replace(/[\s\n\r]/g,'');
-      if(!pk||pk.replace('0x','').length!==64){
-        log('❌ Ordem real requer Private Key','e');
-        return null;
-      }
-      wallet=new ethers.Wallet(pk.startsWith('0x')?pk:'0x'+pk);
-      _polyApiCreds.wallet=wallet;
-      log('🔑 Wallet: '+wallet.address.slice(0,12),'i');
-    }
-    // FUNDER = SIGNER (sem proxy wallet separado nesta conta)
-    const funder=wallet.address;
-    log('maker=signer='+funder.slice(0,14),'i');
+    log('📤 '+side+' '+Math.round(price*100)+'¢ · $'+sizeUSDC+' via Replit...','i');
     
-    // FOK: makerAmount = USDC a gastar, takerAmount = shares mínimas esperadas
-    // Polymarket aceita FOK em dólares sem mínimo de shares
-    const size=parseFloat((sizeUSDC/price).toFixed(4));
-    log('📤 '+side+' '+Math.round(price*100)+'¢ · $'+sizeUSDC+' ('+size.toFixed(2)+' shares) · FOK','i');
-    
-    // EIP-712 Order signing — FOK usa makerAmount em USDC
-    const makerAmount=Math.round(sizeUSDC*1e6); // USDC 6 decimais
-    const takerAmount=Math.round(size*1e6);     // shares 6 decimais
-    const salt=Math.floor(Math.random()*1e15);
-    const tsOrder=String(Math.floor(Date.now()/1000));
-    
-    const domain={
-      name:'CTF Exchange',
-      version:'1',
-      chainId:POLY_CHAIN,
-      verifyingContract:'0x4bFb41d5B3570DeFd03C39a9A4D8dE6Bd8B8982E'
-    };
-    const types={
-      Order:[
-        {name:'salt',type:'uint256'},
-        {name:'maker',type:'address'},
-        {name:'signer',type:'address'},
-        {name:'taker',type:'address'},
-        {name:'tokenId',type:'uint256'},
-        {name:'makerAmount',type:'uint256'},
-        {name:'takerAmount',type:'uint256'},
-        {name:'expiration',type:'uint256'},
-        {name:'nonce',type:'uint256'},
-        {name:'feeRateBps',type:'uint256'},
-        {name:'side',type:'uint8'},
-        {name:'signatureType',type:'uint8'}
-      ]
-    };
-    const orderValue={
-      salt:salt,
-      maker:funder,
-      signer:wallet.address,
-      taker:'0x0000000000000000000000000000000000000000',
-      tokenId:tokenId,
-      makerAmount:String(makerAmount),
-      takerAmount:String(takerAmount),
-      expiration:'0',
-      nonce:'0',
-      feeRateBps:'0',
-      side:side==='BUY'?0:1,
-      signatureType:1 // Magic/Email wallet — uint8
-    };
-    
-    log('🔏 Assinando ordem EIP-712...','i');
-    const orderSig=await wallet._signTypedData(domain,types,orderValue);
-    log('✓ Ordem assinada: '+orderSig.slice(0,20)+'...','i');
-    
-    // Payload da ordem
-    const orderPayload={
-      salt:String(salt),
-      maker:funder,
-      signer:wallet.address,
-      taker:'0x0000000000000000000000000000000000000000',
+    const payload={
       tokenId:String(tokenId),
-      makerAmount:String(makerAmount),
-      takerAmount:String(takerAmount),
-      expiration:'0',
-      nonce:'0',
-      feeRateBps:'0',
       side:side,
-      signatureType:1,
-      signature:orderSig
+      price:parseFloat(price),
+      sizeUSDC:parseFloat(sizeUSDC)
     };
-    const bodyObj={
-      order:orderPayload,
-      owner:_polyApiCreds.apiKey,
-      orderType:'FOK'
-    };
-    log('📋 payload: '+JSON.stringify(bodyObj).slice(0,400),'i');
-    const bodyStr=JSON.stringify(bodyObj);
     
-    const headers=await polyL2Headers('POST','/order',bodyStr);
-    if(!headers){log('❌ Falha ao gerar L2 headers','e');return null;}
-    headers['Content-Type']='application/json';
+    const res=await fetch('https://402c96da-3756-42f1-9277-b9defe4eec42-00-4w9h746o4e99.picard.replit.dev/place-order',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify(payload),
+      signal:AbortSignal.timeout(15000)
+    });
     
-    log('📡 Enviando ordem para Polymarket...','i');
-    log('🌐 Headers L2: '+JSON.stringify({key:headers['POLY_API_KEY']?.slice(0,8),ts:headers['POLY_TIMESTAMP'],sig:headers['POLY_SIGNATURE']?.slice(0,20)}),'i');
-    const res=await fetch(POLY_HOST+'/order',{method:'POST',headers,body:bodyStr});
-    const txt=await res.text();
-    log('📥 HTTP '+res.status+': '+txt.slice(0,300),'i');
+    const data=await res.json();
+    log('📥 Replit /place-order HTTP '+res.status+': '+JSON.stringify(data).slice(0,200),'i');
     
-    let result;
-    try{result=JSON.parse(txt);}catch(e){result={error:txt};}
-    
-    if(res.ok&&(result.success||result.orderID||result.orderId||result.transactionHash)){
-      log('✅ ORDEM REAL EXECUTADA · '+side+' '+Math.round(price*100)+'¢ · $'+sizeUSDC+' · ID:'+(result.orderID||result.orderId||'').slice(0,14),'s');
-      return result;
+    if(data.success){
+      log('✅ ORDEM REAL EXECUTADA · orderId='+String(data.orderId||'').slice(0,20),'s');
+      return data;
     }else{
-      log('❌ Ordem rejeitada ('+res.status+'): '+JSON.stringify(result).slice(0,180),'e');
+      log('❌ Ordem rejeitada: '+data.error,'e');
       return null;
     }
   }catch(e){
@@ -1959,6 +1902,8 @@ async function polyPlaceOrder(tokenId,side,price,sizeUSDC){
     return null;
   }
 }
+
+
 
 // Verificar saldo ao configurar API
 async function checkPolyBalance(){
@@ -3765,8 +3710,8 @@ if(apiConfigured())setTimeout(checkPolyBalance,1000);},300);
             <span id="connBinanceStatus" style="color:var(--txt3)">—</span>
           </div>
         </div>
-        <button onclick="checkAllConnections()" style="margin-top:10px;width:100%;padding:4px;background:rgba(0,229,160,.1);border:1px solid var(--up);border-radius:5px;color:var(--up);font-family:'JetBrains Mono',monospace;font-size:8px;cursor:pointer">
-          🔄 Testar Todas as Conexões
+        <button onclick="diagCompleto()" style="margin-top:10px;width:100%;padding:4px;background:rgba(0,229,160,.1);border:1px solid var(--up);border-radius:5px;color:var(--up);font-family:'JetBrains Mono',monospace;font-size:8px;cursor:pointer">
+          🔍 Diagnóstico Completo
         </button>
       </div>
       
