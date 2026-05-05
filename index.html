@@ -536,7 +536,7 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
 
 <div id="loginScreen">
   <div class="login-box">
-    <div class="login-brand">MASTER<em>BOT</em><sup>v11.7</sup></div>
+    <div class="login-brand">MASTER<em>BOT</em><sup>v11.9</sup></div>
     <div class="login-sub">Acesso Restrito · Trading Platform</div>
     <div class="login-field">
       <label>Login</label>
@@ -554,7 +554,7 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
 <div id="appContent">
 <!-- ═══ TOPBAR ═══ -->
 <div class="topbar">
-  <div class="brand">MASTER<em>BOT</em><sup>v11.7</sup></div>
+  <div class="brand">MASTER<em>BOT</em><sup>v11.9</sup></div>
   <div class="chips" id="chips">
     <div class="chip active" data-sym="BTCUSDT" data-lbl="BTC">BTC</div>
     <div class="chip" data-sym="ETHUSDT" data-lbl="ETH">ETH</div>
@@ -1852,17 +1852,9 @@ async function polyPlaceOrder(tokenId,side,price,sizeUSDC){
       _polyApiCreds.wallet=wallet;
       log('🔑 Wallet: '+wallet.address.slice(0,12),'i');
     }
-    // FUNDER com checksum EIP-55 correcto
-    const rawFunder=(_polyApiCreds.funder||gv('apiFunder')||'').trim();
-    let funder='0xf41dC8B905096eC5ed98fA97A9BBAd8ffAaAF91';
-    if(rawFunder&&rawFunder.startsWith('0x')&&rawFunder.length===42){
-      try{funder=ethers.utils.getAddress(rawFunder);}catch(e){
-        try{funder=ethers.utils.getAddress(rawFunder.toLowerCase());}catch(e2){
-          funder='0xf41dC8B905096eC5ed98fA97A9BBAd8ffAaAF91'; log('⚠ funder fallback','w');
-        }
-      }
-    }
-    log('maker='+funder.slice(0,14),'i');
+    // FUNDER = SIGNER (sem proxy wallet separado nesta conta)
+    const funder=wallet.address;
+    log('maker=signer='+funder.slice(0,14),'i');
     
     // FOK: makerAmount = USDC a gastar, takerAmount = shares mínimas esperadas
     // Polymarket aceita FOK em dólares sem mínimo de shares
