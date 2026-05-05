@@ -536,7 +536,7 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
 
 <div id="loginScreen">
   <div class="login-box">
-    <div class="login-brand">MASTER<em>BOT</em><sup>v12.5</sup></div>
+    <div class="login-brand">MASTER<em>BOT</em><sup>v12.6</sup></div>
     <div class="login-sub">Acesso Restrito · Trading Platform</div>
     <div class="login-field">
       <label>Login</label>
@@ -554,7 +554,7 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
 <div id="appContent">
 <!-- ═══ TOPBAR ═══ -->
 <div class="topbar">
-  <div class="brand">MASTER<em>BOT</em><sup>v12.5</sup></div>
+  <div class="brand">MASTER<em>BOT</em><sup>v12.6</sup></div>
   <div class="chips" id="chips">
     <div class="chip active" data-sym="BTCUSDT" data-lbl="BTC">BTC</div>
     <div class="chip" data-sym="ETHUSDT" data-lbl="ETH">ETH</div>
@@ -1864,44 +1864,130 @@ async function checkAllConnections(){
   await checkPolyBalance();
 }
 
-// ── Executar ordem REAL na Polymarket via Replit ──
+// ── Executar ordem REAL na Polymarket ──
 async function polyPlaceOrder(tokenId,side,price,sizeUSDC){
-  if(!_polyApiCreds){
-    log('⚠ Sem credenciais','w');
-    return null;
-  }
+  if(!_polyApiCreds){log('⚠ Sem credenciais','w');return null;}
   try{
-    log('📤 '+side+' '+Math.round(price*100)+'¢ · $'+sizeUSDC+' via Replit...','i');
+    // 1. Criar wallet a partir da private key
+    const pk=(gv('apiPrivKey')||'').trim().replace(/[\s\n\r]/g,'');
+    if(!pk||pk.replace('0x','').length!==64){
+      log('❌ Private Key inválida','e');return null;
+    }
+    const wallet=new ethers.Wallet(pk.startsWith('0x')?pk:'0x'+pk);
+    const signerAddr=wallet.address; // 0x89C4734d...
     
-    const payload={
-      tokenId:String(tokenId),
-      side:side,
-      price:parseFloat(price),
-      sizeUSDC:parseFloat(sizeUSDC)
+    log('📤 '+side+' '+Math.round(price*100)+'¢ · $'+sizeUSDC,'i');
+    
+    // 2. Calcular amounts
+    const makerAmount=String(Math.round(sizeUSDC*1e6)); // USDC 6 dec
+    const takerAmount=String(Math.round((sizeUSDC/price)*1e6)); // shares 6 dec
+    const salt=String(Math.floor(Math.random()*1e15));
+    
+    // 3. EIP-712 domain e types (CTF Exchange oficial)
+    const domain={
+      name:'ClobAuthDomain',
+      version:'1',
+      chainId:137
+    };
+    const orderDomain={
+      name:'CTF Exchange',
+      version:'1',
+      chainId:137,
+      verifyingContract:'0x4bFb41d5B3570DeFd03C39a9A4D8dE6Bd8B8982E'
+    };
+    const orderTypes={
+      Order:[
+        {name:'salt',type:'uint256'},
+        {name:'maker',type:'address'},
+        {name:'signer',type:'address'},
+        {name:'taker',type:'address'},
+        {name:'tokenId',type:'uint256'},
+        {name:'makerAmount',type:'uint256'},
+        {name:'takerAmount',type:'uint256'},
+        {name:'expiration',type:'uint256'},
+        {name:'nonce',type:'uint256'},
+        {name:'feeRateBps',type:'uint256'},
+        {name:'side',type:'uint8'},
+        {name:'signatureType',type:'uint8'}
+      ]
     };
     
-    const res=await fetch('https://402c96da-3756-42f1-9277-b9defe4eec42-00-4w9h746o4e99.picard.replit.dev/place-order',{
+    // 4. Order value para EIP-712
+    const orderValue={
+      salt:salt,
+      maker:signerAddr,
+      signer:signerAddr,
+      taker:'0x0000000000000000000000000000000000000000',
+      tokenId:String(tokenId),
+      makerAmount:makerAmount,
+      takerAmount:takerAmount,
+      expiration:'0',
+      nonce:'0',
+      feeRateBps:'0',
+      side:side==='BUY'?0:1,
+      signatureType:0
+    };
+    
+    // 5. Assinar com EIP-712
+    log('🔏 Assinando...','i');
+    const orderSig=await wallet._signTypedData(orderDomain,orderTypes,orderValue);
+    log('✓ Assinado: '+orderSig.slice(0,20),'i');
+    
+    // 6. Payload para API
+    const orderPayload={
+      salt:salt,
+      maker:signerAddr,
+      signer:signerAddr,
+      taker:'0x0000000000000000000000000000000000000000',
+      tokenId:String(tokenId),
+      makerAmount:makerAmount,
+      takerAmount:takerAmount,
+      expiration:'0',
+      nonce:'0',
+      feeRateBps:'0',
+      side:side,
+      signatureType:0,
+      signature:orderSig
+    };
+    
+    const bodyObj={
+      order:orderPayload,
+      owner:_polyApiCreds.apiKey,
+      orderType:'FOK'
+    };
+    const bodyStr=JSON.stringify(bodyObj);
+    log('📋 '+bodyStr.slice(0,200),'i');
+    
+    // 7. L2 headers via Replit ou local
+    const headers=await polyL2Headers('POST','/order',bodyStr);
+    if(!headers){log('❌ Sem L2 headers','e');return null;}
+    
+    // 8. Enviar ordem
+    log('📡 Enviando para Polymarket...','i');
+    const res=await fetch('https://clob.polymarket.com/order',{
       method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify(payload),
-      signal:AbortSignal.timeout(15000)
+      headers:headers,
+      body:bodyStr
     });
+    const txt=await res.text();
+    log('📥 HTTP '+res.status+': '+txt.slice(0,300),'i');
     
-    const data=await res.json();
-    log('📥 Replit /place-order HTTP '+res.status+': '+JSON.stringify(data).slice(0,200),'i');
-    
-    if(data.success){
-      log('✅ ORDEM REAL EXECUTADA · orderId='+String(data.orderId||'').slice(0,20),'s');
-      return data;
-    }else{
-      log('❌ Ordem rejeitada: '+data.error,'e');
-      return null;
+    if(res.ok){
+      const r=JSON.parse(txt);
+      if(r.orderID||r.orderId||r.transactionHash||r.success){
+        log('✅ ORDEM REAL EXECUTADA!','s');
+        return r;
+      }
     }
+    log('❌ Ordem falhou: '+txt.slice(0,100),'e');
+    return null;
   }catch(e){
-    log('❌ polyPlaceOrder erro: '+e.message,'e');
+    log('❌ polyPlaceOrder: '+e.message,'e');
     return null;
   }
 }
+
+
 
 
 
