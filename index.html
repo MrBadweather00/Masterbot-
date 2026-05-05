@@ -536,7 +536,7 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
 
 <div id="loginScreen">
   <div class="login-box">
-    <div class="login-brand">MASTER<em>BOT</em><sup>v12.0</sup></div>
+    <div class="login-brand">MASTER<em>BOT</em><sup>v12.1</sup></div>
     <div class="login-sub">Acesso Restrito · Trading Platform</div>
     <div class="login-field">
       <label>Login</label>
@@ -554,7 +554,7 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
 <div id="appContent">
 <!-- ═══ TOPBAR ═══ -->
 <div class="topbar">
-  <div class="brand">MASTER<em>BOT</em><sup>v12.0</sup></div>
+  <div class="brand">MASTER<em>BOT</em><sup>v12.1</sup></div>
   <div class="chips" id="chips">
     <div class="chip active" data-sym="BTCUSDT" data-lbl="BTC">BTC</div>
     <div class="chip" data-sym="ETHUSDT" data-lbl="ETH">ETH</div>
@@ -1924,7 +1924,7 @@ async function polyPlaceOrder(tokenId,side,price,sizeUSDC){
       signatureType:1,
       signature:orderSig
     };
-    log('📋 payload: maker='+funder.slice(0,10)+' token='+String(tokenId).slice(0,10)+' maker$='+makerAmount+' taker='+takerAmount,'i');
+    log('📋 payload completo: '+JSON.stringify(bodyObj).slice(0,400),'i');
     
     const bodyObj={
       order:orderPayload,
