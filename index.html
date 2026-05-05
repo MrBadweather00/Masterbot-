@@ -536,7 +536,7 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
 
 <div id="loginScreen">
   <div class="login-box">
-    <div class="login-brand">MASTER<em>BOT</em><sup>v11.9</sup></div>
+    <div class="login-brand">MASTER<em>BOT</em><sup>v12.0</sup></div>
     <div class="login-sub">Acesso Restrito · Trading Platform</div>
     <div class="login-field">
       <label>Login</label>
@@ -554,7 +554,7 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
 <div id="appContent">
 <!-- ═══ TOPBAR ═══ -->
 <div class="topbar">
-  <div class="brand">MASTER<em>BOT</em><sup>v11.9</sup></div>
+  <div class="brand">MASTER<em>BOT</em><sup>v12.0</sup></div>
   <div class="chips" id="chips">
     <div class="chip active" data-sym="BTCUSDT" data-lbl="BTC">BTC</div>
     <div class="chip" data-sym="ETHUSDT" data-lbl="ETH">ETH</div>
@@ -1901,12 +1901,12 @@ async function polyPlaceOrder(tokenId,side,price,sizeUSDC){
       nonce:'0',
       feeRateBps:'0',
       side:side==='BUY'?0:1,
-      signatureType:1 // Magic/Email wallet
+      signatureType:1 // Magic/Email wallet — uint8
     };
     
     log('🔏 Assinando ordem EIP-712...','i');
     const orderSig=await wallet._signTypedData(domain,types,orderValue);
-    log('✓ Ordem assinada','i');
+    log('✓ Ordem assinada: '+orderSig.slice(0,20)+'...','i');
     
     // Payload da ordem
     const orderPayload={
@@ -1920,7 +1920,7 @@ async function polyPlaceOrder(tokenId,side,price,sizeUSDC){
       expiration:'0',
       nonce:'0',
       feeRateBps:'0',
-      side:side==='BUY'?0:1,
+      side:side,
       signatureType:1,
       signature:orderSig
     };
