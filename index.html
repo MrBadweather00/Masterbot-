@@ -536,7 +536,7 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
 
 <div id="loginScreen">
   <div class="login-box">
-    <div class="login-brand">MASTER<em>BOT</em><sup>v12.9</sup></div>
+    <div class="login-brand">MASTER<em>BOT</em><sup>v13.0</sup></div>
     <div class="login-sub">Acesso Restrito · Trading Platform</div>
     <div class="login-field">
       <label>Login</label>
@@ -554,7 +554,7 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
 <div id="appContent">
 <!-- ═══ TOPBAR ═══ -->
 <div class="topbar">
-  <div class="brand">MASTER<em>BOT</em><sup>v12.9</sup></div>
+  <div class="brand">MASTER<em>BOT</em><sup>v13.0</sup></div>
   <div class="chips" id="chips">
     <div class="chip active" data-sym="BTCUSDT" data-lbl="BTC">BTC</div>
     <div class="chip" data-sym="ETHUSDT" data-lbl="ETH">ETH</div>
@@ -1931,25 +1931,26 @@ async function polyPlaceOrder(tokenId,side,price,sizeUSDC){
       side:side==='BUY'?0:1,
       signatureType:0
     };
+    // Nota: EIP-712 aceita strings para uint256, payload JSON usa ints
     
     // 5. Assinar com EIP-712
     log('🔏 Assinando...','i');
     const orderSig=await wallet._signTypedData(orderDomain,orderTypes,orderValue);
     log('✓ Assinado: '+orderSig.slice(0,20),'i');
     
-    // 6. Payload para API
+    // 6. Payload para API — todos os campos numéricos como INT
     const orderPayload={
-      salt:salt,
+      salt:parseInt(salt),
       maker:signerAddr,
       signer:signerAddr,
       taker:'0x0000000000000000000000000000000000000000',
-      tokenId:String(tokenId),
-      makerAmount:makerAmount,
-      takerAmount:takerAmount,
-      expiration:'0',
-      nonce:'0',
-      feeRateBps:'0',
-      side:side,
+      tokenId:String(tokenId), // tokenId permanece string (número muito grande)
+      makerAmount:parseInt(makerAmount),
+      takerAmount:parseInt(takerAmount),
+      expiration:0,
+      nonce:0,
+      feeRateBps:0,
+      side:side==='BUY'?0:1, // int 0 ou 1
       signatureType:0,
       signature:orderSig
     };
