@@ -536,7 +536,7 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
 
 <div id="loginScreen">
   <div class="login-box">
-    <div class="login-brand">MASTER<em>BOT</em><sup>v13.1</sup></div>
+    <div class="login-brand">MASTER<em>BOT</em><sup>v13.2</sup></div>
     <div class="login-sub">Acesso Restrito · Trading Platform</div>
     <div class="login-field">
       <label>Login</label>
@@ -554,7 +554,7 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
 <div id="appContent">
 <!-- ═══ TOPBAR ═══ -->
 <div class="topbar">
-  <div class="brand">MASTER<em>BOT</em><sup>v13.1</sup></div>
+  <div class="brand">MASTER<em>BOT</em><sup>v13.2</sup></div>
   <div class="chips" id="chips">
     <div class="chip active" data-sym="BTCUSDT" data-lbl="BTC">BTC</div>
     <div class="chip" data-sym="ETHUSDT" data-lbl="ETH">ETH</div>
@@ -1966,6 +1966,24 @@ async function polyPlaceOrder(tokenId,side,price,sizeUSDC){
     // 7. L2 headers via Replit ou local
     const headers=await polyL2Headers('POST','/order',bodyStr);
     if(!headers){log('❌ Sem L2 headers','e');return null;}
+    
+    // 7.5 Validar payload antes de enviar
+    try{
+      const valRes=await fetch('https://402c96da-3756-42f1-9277-b9defe4eec42-00-4w9h746o4e99.picard.replit.dev/validate-order',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:bodyStr,
+        signal:AbortSignal.timeout(5000)
+      });
+      const valData=await valRes.json();
+      if(!valData.valid){
+        log('❌ Payload inválido: '+JSON.stringify(valData.errors),'e');
+        return null;
+      }
+      log('✅ Payload válido ('+valData.summary+')','s');
+    }catch(e){
+      log('⚠ Validação falhou: '+e.message,'w');
+    }
     
     // 8. Enviar ordem
     log('📡 Enviando para Polymarket...','i');
