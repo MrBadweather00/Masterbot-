@@ -536,7 +536,7 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
 
 <div id="loginScreen">
   <div class="login-box">
-    <div class="login-brand">MASTER<em>BOT</em><sup>v13.2</sup></div>
+    <div class="login-brand">MASTER<em>BOT</em><sup>v13.3</sup></div>
     <div class="login-sub">Acesso Restrito · Trading Platform</div>
     <div class="login-field">
       <label>Login</label>
@@ -554,7 +554,7 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
 <div id="appContent">
 <!-- ═══ TOPBAR ═══ -->
 <div class="topbar">
-  <div class="brand">MASTER<em>BOT</em><sup>v13.2</sup></div>
+  <div class="brand">MASTER<em>BOT</em><sup>v13.3</sup></div>
   <div class="chips" id="chips">
     <div class="chip active" data-sym="BTCUSDT" data-lbl="BTC">BTC</div>
     <div class="chip" data-sym="ETHUSDT" data-lbl="ETH">ETH</div>
@@ -1938,19 +1938,19 @@ async function polyPlaceOrder(tokenId,side,price,sizeUSDC){
     const orderSig=await wallet._signTypedData(orderDomain,orderTypes,orderValue);
     log('✓ Assinado: '+orderSig.slice(0,20),'i');
     
-    // 6. Payload para API — todos os campos numéricos como INT
+    // 6. Payload — formato validado pelo Polymarket validator
     const orderPayload={
       salt:parseInt(salt),
       maker:signerAddr,
       signer:signerAddr,
       taker:'0x0000000000000000000000000000000000000000',
-      tokenId:String(tokenId), // tokenId permanece string (número muito grande)
-      makerAmount:parseInt(makerAmount),
-      takerAmount:parseInt(takerAmount),
-      expiration:0,
-      nonce:0,
-      feeRateBps:1000, // 10% fee rate
-      side:side==='BUY'?0:1,
+      tokenId:String(tokenId),
+      makerAmount:String(makerAmount),
+      takerAmount:String(takerAmount),
+      expiration:'0',
+      nonce:'0',
+      feeRateBps:'1000',
+      side:side,
       signatureType:0,
       signature:orderSig
     };
@@ -1958,7 +1958,8 @@ async function polyPlaceOrder(tokenId,side,price,sizeUSDC){
     const bodyObj={
       order:orderPayload,
       owner:_polyApiCreds.apiKey,
-      orderType:'FOK'
+      orderType:'FOK',
+      postOnly:false
     };
     const bodyStr=JSON.stringify(bodyObj);
     log('📋 '+bodyStr.slice(0,200),'i');
