@@ -536,7 +536,7 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
 
 <div id="loginScreen">
   <div class="login-box">
-    <div class="login-brand">MASTER<em>BOT</em><sup>v13.7</sup></div>
+    <div class="login-brand">MASTER<em>BOT</em><sup>v13.8</sup></div>
     <div class="login-sub">Acesso Restrito · Trading Platform</div>
     <div class="login-field">
       <label>Login</label>
@@ -554,7 +554,7 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
 <div id="appContent">
 <!-- ═══ TOPBAR ═══ -->
 <div class="topbar">
-  <div class="brand">MASTER<em>BOT</em><sup>v13.7</sup></div>
+  <div class="brand">MASTER<em>BOT</em><sup>v13.8</sup></div>
   <div class="chips" id="chips">
     <div class="chip active" data-sym="BTCUSDT" data-lbl="BTC">BTC</div>
     <div class="chip" data-sym="ETHUSDT" data-lbl="ETH">ETH</div>
@@ -1925,15 +1925,16 @@ async function polyPlaceOrder(tokenId,side,price,sizeUSDC){
         {name:'builder',type:'bytes32'}
       ]
     };
+    const funderAddr='0xf41dC8B905096Ec5ed98fa97A9BbAd8FFaAaf9Fa'; // perfil Polymarket (deposit wallet)
     const orderValue={
       salt:salt,
-      maker:signerAddr,
-      signer:signerAddr,
+      maker:funderAddr,   // maker = funder (deposit wallet)
+      signer:signerAddr,  // signer = EOA
       tokenId:String(tokenId),
       makerAmount:String(makerAmount),
       takerAmount:String(takerAmount),
       side:side==='BUY'?0:1,
-      signatureType:0,
+      signatureType:1,    // 1 = Magic/Email wallet
       timestamp:timestamp,
       metadata:ZERO_BYTES32,
       builder:ZERO_BYTES32
@@ -1946,13 +1947,13 @@ async function polyPlaceOrder(tokenId,side,price,sizeUSDC){
     // 5. Payload V2
     const orderPayload={
       salt:parseInt(salt),
-      maker:signerAddr,
+      maker:funderAddr,
       signer:signerAddr,
       tokenId:String(tokenId),
       makerAmount:String(makerAmount),
       takerAmount:String(takerAmount),
       side:side,
-      signatureType:0,
+      signatureType:1,
       timestamp:timestamp,
       metadata:ZERO_BYTES32,
       builder:ZERO_BYTES32,
