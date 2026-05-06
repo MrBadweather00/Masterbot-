@@ -536,7 +536,7 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
 
 <div id="loginScreen">
   <div class="login-box">
-    <div class="login-brand">MASTER<em>BOT</em><sup>v13.4</sup></div>
+    <div class="login-brand">MASTER<em>BOT</em><sup>v13.5</sup></div>
     <div class="login-sub">Acesso Restrito · Trading Platform</div>
     <div class="login-field">
       <label>Login</label>
@@ -554,7 +554,7 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
 <div id="appContent">
 <!-- ═══ TOPBAR ═══ -->
 <div class="topbar">
-  <div class="brand">MASTER<em>BOT</em><sup>v13.4</sup></div>
+  <div class="brand">MASTER<em>BOT</em><sup>v13.5</sup></div>
   <div class="chips" id="chips">
     <div class="chip active" data-sym="BTCUSDT" data-lbl="BTC">BTC</div>
     <div class="chip" data-sym="ETHUSDT" data-lbl="ETH">ETH</div>
@@ -1868,39 +1868,129 @@ async function checkAllConnections(){
   await checkPolyBalance();
 }
 
-// ── Executar ordem REAL via Replit ──
+// ── Executar ordem REAL na Polymarket (sem Replit) ──
 async function polyPlaceOrder(tokenId,side,price,sizeUSDC){
   if(!_polyApiCreds){log('⚠ Sem credenciais','w');return null;}
   try{
+    // 1. Criar wallet
+    const pk=(gv('apiPrivKey')||'').trim().replace(/[\s\n\r]/g,'');
+    if(!pk||pk.replace('0x','').length!==64){log('❌ Private Key inválida','e');return null;}
+    const wallet=new ethers.Wallet(pk.startsWith('0x')?pk:'0x'+pk);
+    const signerAddr=wallet.address;
+
     log('📤 '+side+' '+Math.round(price*100)+'¢ · $'+sizeUSDC,'i');
-    
-    const res=await fetch('https://402c96da-3756-42f1-9277-b9defe4eec42-00-4w9h746o4e99.picard.replit.dev/place-order',{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({
-        tokenId:String(tokenId),
-        side:side,
-        price:parseFloat(price),
-        sizeUSDC:parseFloat(sizeUSDC)
-      }),
-      signal:AbortSignal.timeout(15000)
+
+    // 2. Detectar se é neg risk
+    let isNegRisk=false;
+    let verifyingContract='0x4bFb41d5B3570DeFd03C39a9A4D8dE6Bd8B8982E'; // CTF Exchange
+    try{
+      const nr=await fetch('https://clob.polymarket.com/neg-risk?token_id='+String(tokenId),
+        {signal:AbortSignal.timeout(3000)});
+      if(nr.ok){
+        const nrd=await nr.json();
+        isNegRisk=nrd.neg_risk||false;
+        if(isNegRisk){
+          verifyingContract='0xC5d563A36AE78145C45a50134d48A1215220f80a';
+          log('ℹ Neg Risk market detectado','i');
+        }
+      }
+    }catch(e){}
+
+    // 3. Calcular amounts
+    const makerAmount=Math.round(sizeUSDC*1e6);
+    const takerAmount=Math.round((sizeUSDC/price)*1e6);
+    const salt=String(Math.floor(Math.random()*1e9));
+
+    // 4. EIP-712
+    const orderDomain={
+      name:'Polymarket CTF Exchange',
+      version:'1',
+      chainId:137,
+      verifyingContract:verifyingContract
+    };
+    const orderTypes={
+      Order:[
+        {name:'salt',type:'uint256'},
+        {name:'maker',type:'address'},
+        {name:'signer',type:'address'},
+        {name:'taker',type:'address'},
+        {name:'tokenId',type:'uint256'},
+        {name:'makerAmount',type:'uint256'},
+        {name:'takerAmount',type:'uint256'},
+        {name:'expiration',type:'uint256'},
+        {name:'nonce',type:'uint256'},
+        {name:'feeRateBps',type:'uint256'},
+        {name:'side',type:'uint8'},
+        {name:'signatureType',type:'uint8'}
+      ]
+    };
+    const orderValue={
+      salt:salt,
+      maker:signerAddr,
+      signer:signerAddr,
+      taker:'0x0000000000000000000000000000000000000000',
+      tokenId:String(tokenId),
+      makerAmount:String(makerAmount),
+      takerAmount:String(takerAmount),
+      expiration:'0',
+      nonce:'0',
+      feeRateBps:'0',
+      side:side==='BUY'?0:1,
+      signatureType:0
+    };
+
+    log('🔏 Assinando...','i');
+    const orderSig=await wallet._signTypedData(orderDomain,orderTypes,orderValue);
+    log('✓ Assinado','i');
+
+    // 5. Payload
+    const orderPayload={
+      salt:parseInt(salt),
+      maker:signerAddr,
+      signer:signerAddr,
+      taker:'0x0000000000000000000000000000000000000000',
+      tokenId:String(tokenId),
+      makerAmount:String(makerAmount),
+      takerAmount:String(takerAmount),
+      expiration:'0',
+      nonce:'0',
+      feeRateBps:'0',
+      side:side,
+      signatureType:0,
+      signature:orderSig
+    };
+    const bodyObj={order:orderPayload,owner:_polyApiCreds.apiKey,orderType:'FOK',postOnly:false};
+    const bodyStr=JSON.stringify(bodyObj);
+    log('📋 '+bodyStr.slice(0,150),'i');
+
+    // 6. L2 headers
+    const headers=await polyL2Headers('POST','/order',bodyStr);
+    if(!headers){log('❌ Sem L2 headers','e');return null;}
+
+    // 7. Enviar
+    log('📡 Enviando...','i');
+    const res=await fetch('https://clob.polymarket.com/order',{
+      method:'POST',headers,body:bodyStr
     });
-    
-    const data=await res.json();
-    log('📥 HTTP '+res.status+': '+JSON.stringify(data).slice(0,200),'i');
-    
-    if(data.success){
-      log('✅ ORDEM REAL EXECUTADA! orderId='+String(data.orderId||'').slice(0,20),'s');
-      return data;
-    }else{
-      log('❌ Ordem rejeitada: '+data.error,'e');
-      return null;
+    const txt=await res.text();
+    log('📥 HTTP '+res.status+': '+txt.slice(0,200),'i');
+
+    if(res.ok){
+      const r=JSON.parse(txt);
+      if(r.orderID||r.orderId||r.success){
+        log('✅ ORDEM REAL EXECUTADA!','s');
+        return r;
+      }
     }
+    log('❌ Falhou: '+txt.slice(0,100),'e');
+    return null;
   }catch(e){
     log('❌ polyPlaceOrder: '+e.message,'e');
     return null;
   }
 }
+
+
 
 
 
