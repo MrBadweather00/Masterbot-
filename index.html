@@ -536,7 +536,7 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
 
 <div id="loginScreen">
   <div class="login-box">
-    <div class="login-brand">MASTER<em>BOT</em><sup>v12.7</sup></div>
+    <div class="login-brand">MASTER<em>BOT</em><sup>v12.8</sup></div>
     <div class="login-sub">Acesso Restrito · Trading Platform</div>
     <div class="login-field">
       <label>Login</label>
@@ -554,7 +554,7 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
 <div id="appContent">
 <!-- ═══ TOPBAR ═══ -->
 <div class="topbar">
-  <div class="brand">MASTER<em>BOT</em><sup>v12.7</sup></div>
+  <div class="brand">MASTER<em>BOT</em><sup>v12.8</sup></div>
   <div class="chips" id="chips">
     <div class="chip active" data-sym="BTCUSDT" data-lbl="BTC">BTC</div>
     <div class="chip" data-sym="ETHUSDT" data-lbl="ETH">ETH</div>
@@ -1707,8 +1707,8 @@ async function polyL2Headers(method, requestPath, body){
     const key = await crypto.subtle.importKey('raw',keyBytes,
       {name:'HMAC',hash:'SHA-256'},false,['sign']);
     const sigBuf = await crypto.subtle.sign('HMAC',key,new TextEncoder().encode(message));
-    const sig = btoa(String.fromCharCode(...new Uint8Array(sigBuf)))
-      .replace(/\+/g,'-').replace(/\//g,'_');
+    // base64 PADRÃO - confirmado pelo código oficial Polymarket
+    const sig = btoa(String.fromCharCode(...new Uint8Array(sigBuf)));
     
     log('🔐 HMAC local · ts='+ts+' sig='+sig.slice(0,12)+'...','i');
     return {
