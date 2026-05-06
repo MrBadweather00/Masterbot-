@@ -536,7 +536,7 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
 
 <div id="loginScreen">
   <div class="login-box">
-    <div class="login-brand">MASTER<em>BOT</em><sup>v13.6</sup></div>
+    <div class="login-brand">MASTER<em>BOT</em><sup>v13.7</sup></div>
     <div class="login-sub">Acesso Restrito · Trading Platform</div>
     <div class="login-field">
       <label>Login</label>
@@ -554,7 +554,7 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
 <div id="appContent">
 <!-- ═══ TOPBAR ═══ -->
 <div class="topbar">
-  <div class="brand">MASTER<em>BOT</em><sup>v13.6</sup></div>
+  <div class="brand">MASTER<em>BOT</em><sup>v13.7</sup></div>
   <div class="chips" id="chips">
     <div class="chip active" data-sym="BTCUSDT" data-lbl="BTC">BTC</div>
     <div class="chip" data-sym="ETHUSDT" data-lbl="ETH">ETH</div>
@@ -1868,7 +1868,7 @@ async function checkAllConnections(){
   await checkPolyBalance();
 }
 
-// ── Executar ordem REAL na Polymarket (sem Replit) ──
+// ── Executar ordem REAL na Polymarket V2 ──
 async function polyPlaceOrder(tokenId,side,price,sizeUSDC){
   if(!_polyApiCreds){log('⚠ Sem credenciais','w');return null;}
   try{
@@ -1880,9 +1880,9 @@ async function polyPlaceOrder(tokenId,side,price,sizeUSDC){
 
     log('📤 '+side+' '+Math.round(price*100)+'¢ · $'+sizeUSDC,'i');
 
-    // 2. Detectar se é neg risk
+    // 2. Detectar neg risk
     let isNegRisk=false;
-    let verifyingContract='0x4bFb41d5B3570DeFd03C39a9A4D8dE6Bd8B8982E'; // CTF Exchange
+    let verifyingContract='0xE111180000d2663C0091e4f400237545B87B996B'; // V2 CTF Exchange
     try{
       const nr=await fetch('https://clob.polymarket.com/neg-risk?token_id='+String(tokenId),
         {signal:AbortSignal.timeout(3000)});
@@ -1890,8 +1890,8 @@ async function polyPlaceOrder(tokenId,side,price,sizeUSDC){
         const nrd=await nr.json();
         isNegRisk=nrd.neg_risk||false;
         if(isNegRisk){
-          verifyingContract='0xC5d563A36AE78145C45a50134d48A1215220f80a';
-          log('ℹ Neg Risk market detectado','i');
+          verifyingContract='0xe2222d279d744050d28e00520010520000310F59'; // V2 Neg Risk
+          log('ℹ Neg Risk market','i');
         }
       }
     }catch(e){}
@@ -1900,12 +1900,14 @@ async function polyPlaceOrder(tokenId,side,price,sizeUSDC){
     const makerAmount=Math.round(sizeUSDC*1e6);
     const takerAmount=Math.round((sizeUSDC/price)*1e6);
     const salt=String(Math.floor(Math.random()*1e9));
+    const timestamp=String(Date.now()); // milissegundos (V2)
+    const ZERO_BYTES32='0x0000000000000000000000000000000000000000000000000000000000000000';
 
-    // 4. EIP-712
+    // 4. EIP-712 V2
     const orderDomain={
       name:'Polymarket CTF Exchange',
-      version:'1',
-      chainId:'137', // string conforme py-clob-client
+      version:'2',
+      chainId:137,
       verifyingContract:verifyingContract
     };
     const orderTypes={
@@ -1913,50 +1915,47 @@ async function polyPlaceOrder(tokenId,side,price,sizeUSDC){
         {name:'salt',type:'uint256'},
         {name:'maker',type:'address'},
         {name:'signer',type:'address'},
-        {name:'taker',type:'address'},
         {name:'tokenId',type:'uint256'},
         {name:'makerAmount',type:'uint256'},
         {name:'takerAmount',type:'uint256'},
-        {name:'expiration',type:'uint256'},
-        {name:'nonce',type:'uint256'},
-        {name:'feeRateBps',type:'uint256'},
         {name:'side',type:'uint8'},
-        {name:'signatureType',type:'uint8'}
+        {name:'signatureType',type:'uint8'},
+        {name:'timestamp',type:'uint256'},
+        {name:'metadata',type:'bytes32'},
+        {name:'builder',type:'bytes32'}
       ]
     };
     const orderValue={
       salt:salt,
       maker:signerAddr,
       signer:signerAddr,
-      taker:'0x0000000000000000000000000000000000000000',
       tokenId:String(tokenId),
       makerAmount:String(makerAmount),
       takerAmount:String(takerAmount),
-      expiration:'0',
-      nonce:'0',
-      feeRateBps:'0',
       side:side==='BUY'?0:1,
-      signatureType:0
+      signatureType:0,
+      timestamp:timestamp,
+      metadata:ZERO_BYTES32,
+      builder:ZERO_BYTES32
     };
 
-    log('🔏 Assinando...','i');
+    log('🔏 Assinando V2...','i');
     const orderSig=await wallet._signTypedData(orderDomain,orderTypes,orderValue);
-    log('✓ Assinado','i');
+    log('✓ Assinado: '+orderSig.slice(0,20),'i');
 
-    // 5. Payload
+    // 5. Payload V2
     const orderPayload={
       salt:parseInt(salt),
       maker:signerAddr,
       signer:signerAddr,
-      taker:'0x0000000000000000000000000000000000000000',
       tokenId:String(tokenId),
       makerAmount:String(makerAmount),
       takerAmount:String(takerAmount),
-      expiration:'0',
-      nonce:'0',
-      feeRateBps:'0',
       side:side,
       signatureType:0,
+      timestamp:timestamp,
+      metadata:ZERO_BYTES32,
+      builder:ZERO_BYTES32,
       signature:orderSig
     };
     const bodyObj={order:orderPayload,owner:_polyApiCreds.apiKey,orderType:'FOK',postOnly:false};
@@ -1989,6 +1988,8 @@ async function polyPlaceOrder(tokenId,side,price,sizeUSDC){
     return null;
   }
 }
+
+
 
 
 
