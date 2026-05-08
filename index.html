@@ -536,7 +536,7 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
 
 <div id="loginScreen">
   <div class="login-box">
-    <div class="login-brand">MASTER<em>BOT</em><sup>v13.8</sup></div>
+    <div class="login-brand">MASTER<em>BOT</em><sup>v14.1</sup></div>
     <div class="login-sub">Acesso Restrito · Trading Platform</div>
     <div class="login-field">
       <label>Login</label>
@@ -554,7 +554,7 @@ transition:transform .3s ease;z-index:1000;white-space:nowrap;
 <div id="appContent">
 <!-- ═══ TOPBAR ═══ -->
 <div class="topbar">
-  <div class="brand">MASTER<em>BOT</em><sup>v13.8</sup></div>
+  <div class="brand">MASTER<em>BOT</em><sup>v14.1</sup></div>
   <div class="chips" id="chips">
     <div class="chip active" data-sym="BTCUSDT" data-lbl="BTC">BTC</div>
     <div class="chip" data-sym="ETHUSDT" data-lbl="ETH">ETH</div>
@@ -1925,7 +1925,8 @@ async function polyPlaceOrder(tokenId,side,price,sizeUSDC){
         {name:'builder',type:'bytes32'}
       ]
     };
-    const funderAddr='0xf41dC8B905096Ec5ed98fa97A9BbAd8FFaAaf9Fa'; // perfil Polymarket (deposit wallet)
+    const funderAddr=(gv('apiFunder')||'0x7D0dA03e5B2F856D6B21C725510E0b156dBdF8Ac').trim();
+    log('maker='+funderAddr+' signer='+signerAddr,'i');
     const orderValue={
       salt:salt,
       maker:funderAddr,   // maker = funder (deposit wallet)
@@ -3644,7 +3645,7 @@ if(apiConfigured())setTimeout(checkPolyBalance,1000);},300);
             </div>
             <div class="fld" style="margin-bottom:6px">
               <label>Funder Address <span style="color:var(--txt3);font-size:7px">(endereço do seu perfil)</span></label>
-              <input type="password" id="apiFunder" placeholder="0xf41dC8B905096Ec5ed98fa97A9BbAd8FFaAaf9Fa" autocomplete="off">
+              <input type="password" id="apiFunder" placeholder="0x7D0dA03e5B2F856D6B21C725510E0b156dBdF8Ac" autocomplete="off">
             </div>
             <div class="fld-hint" style="margin-bottom:8px;color:var(--txt3)">⚠ Nunca compartilhe — guardado só neste dispositivo</div>
             <!-- Campos legados mantidos ocultos para compatibilidade -->
